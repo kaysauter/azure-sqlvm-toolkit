@@ -26,7 +26,7 @@ Connect-AzAccount
 .\vm_creation_with_bastion.ps1
 ```
 
-See [Getting Started](Getting-Started) for full prerequisites and setup.
+See [Getting Started](Getting-Started.md) for full prerequisites and setup.
 
 ## Important used projects
 - [dbatools](https://dbatools.io)
