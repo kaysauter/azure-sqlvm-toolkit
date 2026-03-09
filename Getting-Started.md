@@ -42,6 +42,18 @@ This reads `config.yaml` from the same directory as the script.
 
 Both relative and absolute paths are supported.
 
+### Display the admin password in the console
+
+By default, the generated VM admin password is **not** printed to the console. It is stored securely in Azure Key Vault and can be retrieved from there at any time.
+
+If you explicitly want the password printed to the console (e.g., for a quick demo or local test), use the `-OutputAdminPassword` flag:
+
+```powershell
+.\vm_creation_with_bastion.ps1 -OutputAdminPassword
+```
+
+> **Security note:** Displaying secrets in console output is not recommended in production environments because the password may be captured in shell history, logs, or screen recordings.
+
 ## What happens during deployment
 
 The script runs for roughly 15 to 20 minutes and creates resources in this order:
@@ -68,9 +80,19 @@ Deployment completed in 00:18:42.
 
 VM Login Credentials:
   Username: youradminusername
-  Password: <generated-password>
+  Password: (stored securely in Key Vault 'Your-Key-Vault-Name' as secret 'vm-admin-password')
+  Tip: Use -OutputAdminPassword to display the password in the console (not recommended).
 ```
-Please note that this is not the recommended way to get the password, especially in production. But for demo purposes, it is printed in the console output. In a production environment, you would typically retrieve the password securely from Key Vault when needed.
+
+The admin password is stored in Azure Key Vault and is not displayed by default. To retrieve it, open the Key Vault in the Azure portal and read the secret named after `keyVault.vmAdminPasswordSecretName` in your `config.yaml`.
+
+If you want the password printed directly to the console (for example, during a quick local demo), pass the `-OutputAdminPassword` flag:
+
+```powershell
+.\vm_creation_with_bastion.ps1 -OutputAdminPassword
+```
+
+> **Security note:** Displaying secrets in console output is not recommended for production use.
 
 If the Key Vault name was changed due to a soft-delete conflict, the script will also notify you of the new name.
 
