@@ -1,0 +1,79 @@
+resourceGroup:
+  name: "your-resource-group-name"
+  location: "Switzerland North"
+  tags:
+    Purpose: "Demo"
+
+network:
+  vnet:
+    addressPrefix: "192.168.0.0/16"
+  subnet:
+    addressPrefix: "192.168.1.0/24"
+  publicIp:
+    allocationMethod: "Static"
+    idleTimeoutInMinutes: 4
+
+securityRules:
+  - name: "RDPRule"
+    protocol: "Tcp"
+    direction: "Inbound"
+    priority: 1000
+    sourceAddressPrefix: "*"
+    sourcePortRange: "*"
+    destinationAddressPrefix: "*"
+    destinationPortRange: 3389
+    access: "Allow"
+  - name: "MSSQLRule"
+    protocol: "Tcp"
+    direction: "Inbound"
+    priority: 1001
+    sourceAddressPrefix: "*"
+    sourcePortRange: "*"
+    destinationAddressPrefix: "*"
+    destinationPortRange: 1433
+    access: "Allow"
+
+keyVault:
+  name: "Your-Key-Vault-Name"
+  storageKeySecretName: "storage-account-key"
+  vmAdminPasswordSecretName: "vm-admin-password"
+  passwordLength: 24
+
+credentials:
+  username: "youradminusername"
+
+vm:
+  size: "Standard_DS13_V2"
+  image:
+    publisherName: "MicrosoftSQLServer"
+    offer: "sql2022-ws2022"
+    skus: "sqldev-gen2"
+    version: "latest"
+
+bastion:
+  subnetAddressPrefix: "192.168.2.0/24"
+  sku: "Basic"
+  publicIp:
+    allocationMethod: "Static"
+    idleTimeoutInMinutes: 4
+    sku: "Standard"
+
+storage:
+  resourceGroup: "YourResourceGroupNameForStorage"
+  accountName: "yourbackstorageaccount"
+  skuName: "Standard_LRS"
+  fileShareName: "sqlbackupshare"
+  driveLetter: "Z"
+  backupPath: '\\'
+
+softwareInstalls:
+  installScript: |
+    Set-ExecutionPolicy Bypass -Scope Process -Force
+    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
+    Invoke-Expression ((New-Object System.Net.WebClient).DownloadString('https://community.chocolatey.org/install.ps1'))
+    $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path', 'User')
+    choco install git powershell-core tabular-editor -y
+    Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
+    Install-Module -Name dbatools -Force
+  logonScript: |
+    code --install-extension ms-mssql.mssql
