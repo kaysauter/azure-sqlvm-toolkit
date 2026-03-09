@@ -1,13 +1,20 @@
+#Requires -Version 5.1
+#Requires -Modules Az.Accounts, Az.Resources, Az.Network, Az.Compute, Az.KeyVault, Az.Storage
+[CmdletBinding(SupportsShouldProcess)]
 param(
     [Parameter(Mandatory = $false)]
     [string]$ConfigFile = "config.yaml"
 )
 
+$ErrorActionPreference = 'Stop'
+
 $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+
+try {
 
 # Load configuration from YAML
 if (-not (Get-Module -ListAvailable -Name powershell-yaml)) {
-    Install-Module -Name powershell-yaml -Force -Scope CurrentUser
+    Install-Module -Name powershell-yaml -Force -Scope CurrentUser -MinimumVersion '0.4.7'
 }
 Import-Module powershell-yaml
 
@@ -25,6 +32,25 @@ if (-not (Test-Path $ConfigPath)) {
 
 $config = Get-Content $ConfigPath -Raw | ConvertFrom-Yaml
 
+# Validate required configuration values
+$requiredPaths = @(
+    'resourceGroup.name', 'resourceGroup.location',
+    'keyVault.name', 'keyVault.vmAdminPasswordSecretName', 'keyVault.storageKeySecretName',
+    'storage.accountName', 'storage.fileShareName', 'storage.resourceGroup', 'storage.driveLetter',
+    'network.vnet.addressPrefix', 'network.subnet.addressPrefix',
+    'credentials.username',
+    'vm.size',
+    'bastion.subnetAddressPrefix', 'bastion.sku'
+)
+foreach ($path in $requiredPaths) {
+    $parts = $path -split '\.'
+    $value = $config
+    foreach ($part in $parts) { $value = $value.$part }
+    if ([string]::IsNullOrWhiteSpace($value)) {
+        throw "Required configuration value missing: $path"
+    }
+}
+
 # Use the default subscription from the current Azure context
 $currentContext = Get-AzContext
 if (-not $currentContext) {
@@ -38,7 +64,6 @@ $ResourceGroupName = $config.resourceGroup.name
 $Location = $config.resourceGroup.location
 $SubnetName = $ResourceGroupName + "subnet"
 $VnetName = $ResourceGroupName + "vnet"
-$PipName = $ResourceGroupName + $(Get-Random)
 $NsgName = $ResourceGroupName + "nsg"
 $InterfaceName = $ResourceGroupName + "int"
 $VMName = $ResourceGroupName + "VM"
@@ -51,13 +76,18 @@ $FileShareName = $config.storage.fileShareName
 $StorageResourceGroupName = $config.storage.resourceGroup
 
 # Resource Group
-$ResourceGroupParams = @{
-    Name     = $ResourceGroupName
-    Location = $Location
-    Tag      = $config.resourceGroup.tags
+$existingRg = Get-AzResourceGroup -Name $ResourceGroupName -ErrorAction SilentlyContinue
+if (-not $existingRg) {
+    $ResourceGroupParams = @{
+        Name     = $ResourceGroupName
+        Location = $Location
+        Tag      = $config.resourceGroup.tags
+    }
+    New-AzResourceGroup @ResourceGroupParams | Out-Null
+    Write-Host "Resource group '$ResourceGroupName' created."
+} else {
+    Write-Host "Resource group '$ResourceGroupName' already exists."
 }
-
-New-AzResourceGroup @ResourceGroupParams | Out-Null
 
 # Storage Resource Group (separate from VM to survive VM RG deletion)
 $storageRg = Get-AzResourceGroup -Name $StorageResourceGroupName -ErrorAction SilentlyContinue
@@ -88,7 +118,8 @@ else {
         } while ($existing -or $stillDeleted)
         Write-Host "Original Key Vault name is soft-deleted. Using '$KeyVaultName' instead."
     }
-    New-AzKeyVault -Name $KeyVaultName -ResourceGroupName $StorageResourceGroupName -Location $Location -DisableRbacAuthorization
+    New-AzKeyVault -Name $KeyVaultName -ResourceGroupName $StorageResourceGroupName -Location $Location `
+        -DisableRbacAuthorization -EnablePurgeProtection
     Write-Host "Key Vault '$KeyVaultName' created."
 
     # Wait for Key Vault DNS to propagate
@@ -117,20 +148,34 @@ if (-not $existingSecret) {
     $digits = '0123456789'
     $special = '!@#$%^&*()-_=+[]{}|;:,.<>?'
     $allChars = $lower + $upper + $digits + $special
-    $rng = [System.Security.Cryptography.RNGCryptoServiceProvider]::new()
-    $bytes = [byte[]]::new($passwordLength)
-    $rng.GetBytes($bytes)
+
+    $rng = [System.Security.Cryptography.RandomNumberGenerator]::Create()
+    # Use rejection sampling to eliminate modulo bias
+    $charCount = $allChars.Length
+    # Find the largest multiple of $charCount that fits in a byte (0..255)
+    $maxUnbiased = [Math]::Floor(256 / $charCount) * $charCount
     $password = [char[]]::new($passwordLength)
+    $buf = [byte[]]::new(1)
     for ($i = 0; $i -lt $passwordLength; $i++) {
-        $password[$i] = $allChars[$bytes[$i] % $allChars.Length]
+        do {
+            $rng.GetBytes($buf)
+        } while ($buf[0] -ge $maxUnbiased)
+        $password[$i] = $allChars[$buf[0] % $charCount]
     }
-    # Guarantee at least one of each type using secure random positions
-    $posBytes = [byte[]]::new(4)
-    $rng.GetBytes($posBytes)
-    $password[$posBytes[0] % $passwordLength] = $lower[(Get-Random -Maximum $lower.Length)]
-    $password[$posBytes[1] % $passwordLength] = $upper[(Get-Random -Maximum $upper.Length)]
-    $password[$posBytes[2] % $passwordLength] = $digits[(Get-Random -Maximum $digits.Length)]
-    $password[$posBytes[3] % $passwordLength] = $special[(Get-Random -Maximum $special.Length)]
+    # Guarantee at least one of each required character type using rejection sampling
+    $charSets = @($lower, $upper, $digits, $special)
+    $posBuf = [byte[]]::new(1)
+    for ($s = 0; $s -lt $charSets.Count; $s++) {
+        $set = $charSets[$s]
+        # Pick a secure random position
+        $maxPos = [Math]::Floor(256 / $passwordLength) * $passwordLength
+        do { $rng.GetBytes($posBuf) } while ($posBuf[0] -ge $maxPos)
+        $pos = $posBuf[0] % $passwordLength
+        # Pick a secure random char from the set
+        $maxChar = [Math]::Floor(256 / $set.Length) * $set.Length
+        do { $rng.GetBytes($buf) } while ($buf[0] -ge $maxChar)
+        $password[$pos] = $set[$buf[0] % $set.Length]
+    }
     $rng.Dispose()
     $plainPassword = -join $password
     $SecureVmPassword = ConvertTo-SecureString $plainPassword -AsPlainText -Force
@@ -143,58 +188,82 @@ else {
     Write-Host "VM admin password already exists in Key Vault."
 }
 
-# Networking
-$SubnetConfig = New-AzVirtualNetworkSubnetConfig -Name $SubnetName `
-    -AddressPrefix $config.network.subnet.addressPrefix
+# Networking - VNet
+$existingVnet = Get-AzVirtualNetwork -Name $VnetName -ResourceGroupName $ResourceGroupName -ErrorAction SilentlyContinue
+if (-not $existingVnet) {
+    $SubnetConfig = New-AzVirtualNetworkSubnetConfig -Name $SubnetName `
+        -AddressPrefix $config.network.subnet.addressPrefix
 
-$Vnet = New-AzVirtualNetwork -ResourceGroupName $ResourceGroupName `
-    -Location $Location `
-    -Name $VnetName -AddressPrefix $config.network.vnet.addressPrefix `
-    -Subnet $SubnetConfig
-
-$Pip = New-AzPublicIpAddress -ResourceGroupName $ResourceGroupName -Location $Location `
-    -AllocationMethod $config.network.publicIp.allocationMethod `
-    -IdleTimeoutInMinutes $config.network.publicIp.idleTimeoutInMinutes -Name $PipName
-
-# Network Security Group
-$NsgRules = @()
-foreach ($rule in $config.securityRules) {
-    $NsgRules += New-AzNetworkSecurityRuleConfig `
-        -Name $rule.name `
-        -Protocol $rule.protocol `
-        -Direction $rule.direction `
-        -Priority $rule.priority `
-        -SourceAddressPrefix $rule.sourceAddressPrefix `
-        -SourcePortRange $rule.sourcePortRange `
-        -DestinationAddressPrefix $rule.destinationAddressPrefix `
-        -DestinationPortRange $rule.destinationPortRange `
-        -Access $rule.access
+    $Vnet = New-AzVirtualNetwork -ResourceGroupName $ResourceGroupName `
+        -Location $Location `
+        -Name $VnetName -AddressPrefix $config.network.vnet.addressPrefix `
+        -Subnet $SubnetConfig
+    Write-Host "Virtual network '$VnetName' created."
+} else {
+    $Vnet = $existingVnet
+    Write-Host "Virtual network '$VnetName' already exists."
 }
 
-$Nsg = New-AzNetworkSecurityGroup -ResourceGroupName $ResourceGroupName `
-    -Location $Location -Name $NsgName -SecurityRules $NsgRules
+# Network Security Group
+$existingNsg = Get-AzNetworkSecurityGroup -Name $NsgName -ResourceGroupName $ResourceGroupName -ErrorAction SilentlyContinue
+if (-not $existingNsg) {
+    $NsgRules = @()
+    foreach ($rule in $config.securityRules) {
+        $NsgRules += New-AzNetworkSecurityRuleConfig `
+            -Name $rule.name `
+            -Protocol $rule.protocol `
+            -Direction $rule.direction `
+            -Priority $rule.priority `
+            -SourceAddressPrefix $rule.sourceAddressPrefix `
+            -SourcePortRange $rule.sourcePortRange `
+            -DestinationAddressPrefix $rule.destinationAddressPrefix `
+            -DestinationPortRange $rule.destinationPortRange `
+            -Access $rule.access
+    }
 
-$Interface = New-AzNetworkInterface -Name $InterfaceName `
-    -ResourceGroupName $ResourceGroupName -Location $Location `
-    -SubnetId $VNet.Subnets[0].Id -PublicIpAddressId $Pip.Id `
-    -NetworkSecurityGroupId $Nsg.Id
+    $Nsg = New-AzNetworkSecurityGroup -ResourceGroupName $ResourceGroupName `
+        -Location $Location -Name $NsgName -SecurityRules $NsgRules
+    Write-Host "Network security group '$NsgName' created."
+} else {
+    $Nsg = $existingNsg
+    Write-Host "Network security group '$NsgName' already exists."
+}
+
+# Network Interface
+$existingInterface = Get-AzNetworkInterface -Name $InterfaceName -ResourceGroupName $ResourceGroupName -ErrorAction SilentlyContinue
+if (-not $existingInterface) {
+    $Interface = New-AzNetworkInterface -Name $InterfaceName `
+        -ResourceGroupName $ResourceGroupName -Location $Location `
+        -SubnetId $VNet.Subnets[0].Id `
+        -NetworkSecurityGroupId $Nsg.Id
+    Write-Host "Network interface '$InterfaceName' created."
+} else {
+    $Interface = $existingInterface
+    Write-Host "Network interface '$InterfaceName' already exists."
+}
 
 # VM Credentials
 $Cred = New-Object System.Management.Automation.PSCredential `
 ($config.credentials.username, $SecureVmPassword)
 
 # Virtual Machine
-$VMConfig = New-AzVMConfig -VMName $VMName -VMSize $config.vm.size |
-Set-AzVMOperatingSystem -Windows -ComputerName $VMName `
-    -Credential $Cred -ProvisionVMAgent -EnableAutoUpdate |
-Set-AzVMSourceImage `
-    -PublisherName $config.vm.image.publisherName `
-    -Offer $config.vm.image.offer `
-    -Skus $config.vm.image.skus `
-    -Version $config.vm.image.version |
-Add-AzVMNetworkInterface -Id $Interface.Id
+$existingVm = Get-AzVM -ResourceGroupName $ResourceGroupName -Name $VMName -ErrorAction SilentlyContinue
+if (-not $existingVm) {
+    $VMConfig = New-AzVMConfig -VMName $VMName -VMSize $config.vm.size |
+    Set-AzVMOperatingSystem -Windows -ComputerName $VMName `
+        -Credential $Cred -ProvisionVMAgent -EnableAutoUpdate |
+    Set-AzVMSourceImage `
+        -PublisherName $config.vm.image.publisherName `
+        -Offer $config.vm.image.offer `
+        -Skus $config.vm.image.skus `
+        -Version $config.vm.image.version |
+    Add-AzVMNetworkInterface -Id $Interface.Id
 
-New-AzVM -ResourceGroupName $ResourceGroupName -Location $Location -VM $VMConfig | Out-Null
+    New-AzVM -ResourceGroupName $ResourceGroupName -Location $Location -VM $VMConfig | Out-Null
+    Write-Host "Virtual machine '$VMName' created."
+} else {
+    Write-Host "Virtual machine '$VMName' already exists."
+}
 
 # Enable system-assigned managed identity on the VM
 $vm = Get-AzVM -ResourceGroupName $ResourceGroupName -Name $VMName
@@ -213,10 +282,16 @@ $BastionPip = New-AzPublicIpAddress -ResourceGroupName $ResourceGroupName `
     -IdleTimeoutInMinutes $config.bastion.publicIp.idleTimeoutInMinutes `
     -Sku $config.bastion.publicIp.sku
 
-New-AzBastion -ResourceGroupName $ResourceGroupName -Name $BastionName `
-    -PublicIpAddressRgName $ResourceGroupName -PublicIpAddressName $BastionPipName `
-    -VirtualNetworkRgName $ResourceGroupName -VirtualNetworkName $VnetName `
-    -Sku $config.bastion.sku | Out-Null
+$existingBastion = Get-AzBastion -ResourceGroupName $ResourceGroupName -Name $BastionName -ErrorAction SilentlyContinue
+if (-not $existingBastion) {
+    New-AzBastion -ResourceGroupName $ResourceGroupName -Name $BastionName `
+        -PublicIpAddressRgName $ResourceGroupName -PublicIpAddressName $BastionPipName `
+        -VirtualNetworkRgName $ResourceGroupName -VirtualNetworkName $VnetName `
+        -Sku $config.bastion.sku | Out-Null
+    Write-Host "Bastion '$BastionName' created."
+} else {
+    Write-Host "Bastion '$BastionName' already exists."
+}
 
 # Storage Account & File Share
 $storageAccount = Get-AzStorageAccount -ResourceGroupName $StorageResourceGroupName `
@@ -266,7 +341,8 @@ Write-Host ($installResult.Value | Out-String)
 if ($config.softwareInstalls.logonScript) {
     $logonTaskScript = @'
 param($LogonScript, $Username)
-$scriptPath = "C:\setup-logon.ps1"
+New-Item -Path 'C:\ProgramData\AzureSetup' -ItemType Directory -Force | Out-Null
+$scriptPath = "C:\ProgramData\AzureSetup\setup-logon.ps1"
 $selfCleanup = @"
 $LogonScript
 Unregister-ScheduledTask -TaskName 'SetupLogonTask' -Confirm:`$false
@@ -303,10 +379,12 @@ New-SmbGlobalMapping -RemotePath "\\$StorageAccountName.file.core.windows.net\$F
 "@
 
 # Run the mount now
-Invoke-Expression $mountCode
+$mountBlock = [ScriptBlock]::Create($mountCode)
+& $mountBlock
 
 # Register as a startup scheduled task so it survives reboots
-$scriptPath = "C:\mount-fileshare.ps1"
+New-Item -Path 'C:\ProgramData\AzureSetup' -ItemType Directory -Force | Out-Null
+$scriptPath = "C:\ProgramData\AzureSetup\mount-fileshare.ps1"
 Set-Content -Path $scriptPath -Value $mountCode
 $action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-ExecutionPolicy Bypass -File $scriptPath"
 $trigger = New-ScheduledTaskTrigger -AtStartup
@@ -357,9 +435,25 @@ $stopwatch.Stop()
 Write-Host "`nDeployment completed in $($stopwatch.Elapsed.ToString('hh\:mm\:ss'))." -ForegroundColor Green
 Write-Host "`nVM Login Credentials:" -ForegroundColor Cyan
 Write-Host "  Username: $($config.credentials.username)" -ForegroundColor Yellow
-Write-Host "  Password: $plainPassword" -ForegroundColor Yellow
+Write-Host "  Password: stored in Key Vault '$KeyVaultName' as secret '$VmAdminSecretName'" -ForegroundColor Yellow
 
 if ($KeyVaultName -ne $OriginalKeyVaultName) {
     Write-Host "`nNote: Key Vault name '$OriginalKeyVaultName' was unavailable (soft-deleted). Created as '$KeyVaultName' instead." -ForegroundColor Yellow
     Write-Host "Update config.yaml with the new name to reuse it on future runs." -ForegroundColor Yellow
+}
+
+}
+catch {
+    Write-Host "`nDeployment failed with error:" -ForegroundColor Red
+    Write-Host $_.Exception.Message -ForegroundColor Red
+    Write-Host $_.ScriptStackTrace -ForegroundColor Red
+    Write-Host "`nPlease review and manually clean up any partially created resources in resource group '$ResourceGroupName'." -ForegroundColor Yellow
+    exit 1
+}
+finally {
+    # Clear sensitive variables from memory
+    if ($null -ne $plainPassword) { $plainPassword = $null }
+    if ($null -ne $StorageAccountKey) { $StorageAccountKey = $null }
+    if ($null -ne $SecureVmPassword) { $SecureVmPassword = $null }
+    if ($null -ne $Cred) { $Cred = $null }
 }
