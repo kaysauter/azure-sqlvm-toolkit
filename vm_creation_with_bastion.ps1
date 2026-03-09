@@ -1,6 +1,9 @@
 param(
     [Parameter(Mandatory = $false)]
-    [string]$ConfigFile = "config.yaml"
+    [string]$ConfigFile = "config.yaml",
+
+    [Parameter(Mandatory = $false)]
+    [switch]$OutputAdminPassword
 )
 
 $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
@@ -357,7 +360,14 @@ $stopwatch.Stop()
 Write-Host "`nDeployment completed in $($stopwatch.Elapsed.ToString('hh\:mm\:ss'))." -ForegroundColor Green
 Write-Host "`nVM Login Credentials:" -ForegroundColor Cyan
 Write-Host "  Username: $($config.credentials.username)" -ForegroundColor Yellow
-Write-Host "  Password: $plainPassword" -ForegroundColor Yellow
+if ($OutputAdminPassword) {
+    Write-Host "  Password: $plainPassword" -ForegroundColor Yellow
+    Write-Host "  Note: Displaying the password in the console is not recommended for security reasons." -ForegroundColor DarkYellow
+}
+else {
+    Write-Host "  Password: (stored securely in Key Vault '$KeyVaultName' as secret '$VmAdminSecretName')" -ForegroundColor Yellow
+    Write-Host "  Tip: Use -OutputAdminPassword to display the password in the console (not recommended)." -ForegroundColor DarkYellow
+}
 
 if ($KeyVaultName -ne $OriginalKeyVaultName) {
     Write-Host "`nNote: Key Vault name '$OriginalKeyVaultName' was unavailable (soft-deleted). Created as '$KeyVaultName' instead." -ForegroundColor Yellow
