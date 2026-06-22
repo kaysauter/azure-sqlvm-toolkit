@@ -61,11 +61,19 @@ function Get-ToolkitGuestInstallScript {
         $manager = Get-ToolkitConfigValue -Config $package -Path "manager" -Required
         $name = Get-ToolkitConfigValue -Config $package -Path "name" -Required
         $version = Get-ToolkitConfigValue -Config $package -Path "version" -Required
+        $sha256 = Get-ToolkitConfigValue -Config $package -Path "sha256"
         switch ($manager) {
             "Chocolatey" {
-                $lines.Add("choco install $name --version $version -y")
+                $command = "choco install $name --version $version -y"
+                if (-not [string]::IsNullOrWhiteSpace([string]$sha256)) {
+                    $command += " --checksum $sha256 --checksum-type sha256"
+                }
+                $lines.Add($command)
             }
             "PowerShellGallery" {
+                if (-not [string]::IsNullOrWhiteSpace([string]$sha256)) {
+                    throw "softwareInstalls.packages[].sha256 is only supported for Chocolatey packages."
+                }
                 $lines.Add("Install-Module -Name $name -RequiredVersion $version -Scope AllUsers -Force")
             }
         }
@@ -171,4 +179,3 @@ Register-ScheduledTask -TaskName "SetupLogonTask" -Action $action -Trigger $trig
 
     return Write-ToolkitDeploymentStep -Name "Guest setup" -Status "Updated" -Message "Guest setup completed and restore helper uploaded."
 }
-

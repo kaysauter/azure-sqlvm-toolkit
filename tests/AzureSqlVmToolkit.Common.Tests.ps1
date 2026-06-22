@@ -137,6 +137,21 @@ Describe "Test-ToolkitConfig" {
 
         { Test-ToolkitConfig -Config $config } | Should -Throw -ExpectedMessage "*bastion.sku*"
     }
+
+    It "rejects PowerShell Gallery package SHA-256 values because they are not enforced" {
+        $config = Get-ValidToolkitConfig
+        $sha256 = "a" * 64
+        $config.softwareInstalls["packages"] = @(
+            @{
+                manager = "PowerShellGallery"
+                name    = "dbatools"
+                version = "2.7.25"
+                sha256  = $sha256
+            }
+        )
+
+        { Test-ToolkitConfig -Config $config } | Should -Throw -ExpectedMessage "*sha256 is only supported for Chocolatey*"
+    }
 }
 
 Describe "Generated password" {

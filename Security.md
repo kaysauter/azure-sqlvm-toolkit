@@ -72,13 +72,13 @@ The VM managed identity reads the storage-key secret so the guest can mount Azur
 
 ## Guest Setup
 
-The current config contains structured package metadata plus PowerShell hooks that run inside the VM through Azure VM Run Command. The sample pins versions for Git, PowerShell, Tabular Editor, and dbatools.
+The current config contains structured package metadata plus PowerShell hooks that run inside the VM through Azure VM Run Command. The sample pins versions for Git, PowerShell, Tabular Editor, and dbatools. Chocolatey package `sha256` values are enforced when configured; PowerShell Gallery package checksums are rejected because the current install path cannot enforce them.
 
 This is acceptable for demos and learning environments. For higher-trust environments:
 
 - Pin package versions.
 - Set `softwareInstalls.allowDynamicBootstrap: false` and use a prepared image or internal package source.
-- Mirror or verify installer content and add SHA-256 values where possible.
+- Mirror or verify installer content and add Chocolatey bootstrap/package SHA-256 values where available.
 - Review every command in `softwareInstalls.installScript`.
 - Keep `softwareInstalls.logonScript` minimal and trusted.
 

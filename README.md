@@ -97,6 +97,8 @@ The module and compatibility script read the explicit YAML shape in `config.yaml
 - `softwareInstalls`
 
 The sample `softwareInstalls` section uses structured package metadata for pinned package versions and keeps `installScript` as an additional custom hook.
+Chocolatey package `sha256` values are enforced through `choco install --checksum`; PowerShell Gallery package `sha256` values are rejected because the current install path cannot enforce them.
+Package `sourceUri` values are review/provenance references only, not install sources.
 
 The sample config disables the VM public IP and includes no broad inbound RDP or SQL rules:
 
@@ -122,6 +124,10 @@ If you intentionally enable `network.publicIp.enabled`, keep NSG sources tightly
 
 See [Security.md](Security.md) for details.
 
+## Developing
+
+Developer workflow, repository layout, test expectations, documentation rules, and security guidelines are documented in [CONTRIBUTING.md](CONTRIBUTING.md).
+
 ## Local Checks
 
 Run:
@@ -136,8 +142,9 @@ It also verifies that `VERSION` matches the module manifest.
 For the full local check, install the optional test tooling:
 
 ```powershell
-Install-Module -Name Pester -Scope CurrentUser -Force -SkipPublisherCheck
-Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force
+Install-Module -Name powershell-yaml -RequiredVersion 0.4.12 -Scope CurrentUser -Force
+Install-Module -Name Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -SkipPublisherCheck
+Install-Module -Name PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser -Force
 ```
 
 ## Roadmap

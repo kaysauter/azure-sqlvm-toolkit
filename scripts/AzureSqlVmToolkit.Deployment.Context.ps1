@@ -75,6 +75,10 @@ function Test-ToolkitStepSkipped {
         [string]$Message
     )
 
+    if ($Step -and $Step.PSObject.Properties["Step"]) {
+        $Step = $Step.Step
+    }
+
     if ($Step -and $Step.Status -eq "Skipped") {
         Write-ToolkitWarning -Message $Message
         return $true
@@ -135,4 +139,3 @@ function Get-ToolkitAzureContext {
 
     return $currentContext
 }
-

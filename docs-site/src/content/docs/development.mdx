@@ -1,7 +1,38 @@
 ---
 title: Development
-description: Contributor notes for the current module-based toolkit.
+description: Contributor workflow for the current module-based toolkit.
 ---
+
+The source contributor guide lives in [CONTRIBUTING.md](https://github.com/kaysauter/azure-sqlvm-toolkit/blob/main/CONTRIBUTING.md). This page summarizes the same workflow for the published documentation site.
+
+## Repository Layout
+
+| Path | Purpose |
+| --- | --- |
+| `AzureSqlVmToolkit.psd1`, `AzureSqlVmToolkit.psm1` | Module manifest and root module loader. |
+| `Public/` | Public command entry points. |
+| `scripts/` | Internal validation, naming, deployment, guest setup, release, and test helpers. |
+| `tests/` | Pester tests for public commands and internal helpers. |
+| `schemas/` | Editor-facing JSON schema for `config.yaml`. |
+| `docs-site/` | Astro/Starlight documentation site and Slidev pitch deck. |
+
+## Setup
+
+Install the PowerShell modules used by local checks and CI:
+
+```powershell
+Install-Module -Name Az -Scope CurrentUser -Force
+Install-Module -Name powershell-yaml -RequiredVersion 0.4.12 -Scope CurrentUser -Force
+Install-Module -Name Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -SkipPublisherCheck
+Install-Module -Name PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser -Force
+```
+
+Install documentation dependencies when working on the site:
+
+```bash
+cd docs-site
+npm ci
+```
 
 ## Local Files
 
@@ -12,33 +43,78 @@ Use ignored local files for environment-specific settings:
 - `*.local.md`
 - `.env`
 
-Do not commit secrets, generated cost notes, or screenshots that reveal Azure account details.
+Do not commit secrets, generated cost notes, screenshots, terminal output, or config values that reveal Azure account details.
+
+## Workflow
+
+1. Keep changes focused.
+2. Update tests when behavior changes.
+3. Update `schemas/config.schema.json` when the YAML contract changes.
+4. Update root docs and Astro docs when command behavior, config fields, security posture, release behavior, or deployment flow changes.
+5. Run the smallest useful check first, then broader checks before publishing.
+
+Use `-Plan` for no-Azure validation. Use `-WhatIf` after signing in when you need Azure-aware create/reuse/drift output without mutating resources.
 
 ## Checks
+
+Run the local toolkit check before publishing module, script, config, schema, or test changes:
+
+```powershell
+.\scripts\Test-Local.ps1 -ConfigFile .\config.yaml
+```
+
+If your local config is complete and safe to use, also run:
 
 ```powershell
 .\scripts\Test-Local.ps1 -ConfigFile .\config.local.yaml
 ```
 
-This is the minimum check before publishing module, script, config, or docs changes.
-
-The public module surface lives in `AzureSqlVmToolkit.psd1`, `AzureSqlVmToolkit.psm1`, and `Public/`. Reusable validation, naming, output, password, role-assignment, reconciliation-result, deployment, and guest-script helpers live in `scripts/`. Focused Pester tests live in `tests/`.
-
-## Docs
-
-The published docs live under `docs-site/`.
+For documentation changes:
 
 ```bash
 cd docs-site
 npm run build
 ```
 
+For docs dependency changes:
+
+```bash
+cd docs-site
+npm audit
+```
+
+Always run:
+
+```bash
+git diff --check
+```
+
+## PowerShell Conventions
+
+- Keep public commands in `Public/`; put reusable implementation in `scripts/`.
+- Prefer structured config validation over late deployment failures.
+- Prefer injected scriptblocks for Azure calls in internal helpers so behavior can be tested without live Azure.
+- Return structured deployment step results for create/reuse/update/skip/drift decisions.
+- Keep `-Plan` and `-WhatIf` separate: `-Plan` does not require Azure; `-WhatIf` may read Azure state but must not mutate resources.
+- Fail early on unsafe drift. Only auto-update drift when the behavior is explicit and tested.
+
+## Security Rules
+
+- Keep the VM public IP disabled by default.
+- Keep sample `securityRules` empty.
+- Reject broad inbound RDP and SQL rules.
+- Do not add passwords, keys, tokens, or tenant-specific identifiers to tracked files.
+- Treat guest setup package metadata and scripts as trusted code inputs.
+- Chocolatey package `sha256` values are enforced through `choco install --checksum`.
+- PowerShell Gallery package `sha256` values are rejected because the current install path cannot enforce them.
+- Package `sourceUri` values are review/provenance references only, not install sources.
+
 ## GitHub Actions
 
 - `Deploy docs` builds and publishes the documentation site.
-- `Test toolkit` validates the PowerShell script, common module, tests, sample config, docs dependency audit, and docs build.
+- `Test toolkit` validates PowerShell, schema, tests, sample config, docs dependency audit, and docs build.
 - `Release toolkit` validates version metadata, runs local checks, builds docs, packages the module, and creates a GitHub release from a matching `vX.Y.Z` tag.
 
 ## Release Work
 
-Keep `VERSION`, `AzureSqlVmToolkit.psd1`, and `CHANGELOG.md` aligned. See `RELEASE.md` for the release checklist and nightly snapshot guidance.
+Keep `VERSION`, `AzureSqlVmToolkit.psd1`, and `CHANGELOG.md` aligned. See [Release Process](/azure-sqlvm-toolkit/release-process/) and [RELEASE.md](https://github.com/kaysauter/azure-sqlvm-toolkit/blob/main/RELEASE.md) for the release checklist and nightly snapshot guidance.

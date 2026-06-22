@@ -55,8 +55,15 @@ function Invoke-AzureSqlVmToolkitDeployment {
     Write-ToolkitSuccess -Message "Using subscription: $($currentContext.Subscription.Name)"
     $subscriptionId = $currentContext.Subscription.Id
 
-    Ensure-ToolkitResourceGroup -Name $names.ResourceGroupName -Location $location -Tag $config.resourceGroup.tags -WhatIf:$WhatIfPreference | Out-Null
-    Ensure-ToolkitResourceGroup -Name $names.StorageResourceGroupName -Location $location -Tag $config.resourceGroup.tags -WhatIf:$WhatIfPreference | Out-Null
+    $resourceGroupStep = Ensure-ToolkitResourceGroup -Name $names.ResourceGroupName -Location $location -Tag $config.resourceGroup.tags -WhatIf:$WhatIfPreference
+    if (Test-ToolkitStepSkipped -Step $resourceGroupStep -Message "Stopping deployment because the workload resource group step was skipped.") {
+        return
+    }
+
+    $storageResourceGroupStep = Ensure-ToolkitResourceGroup -Name $names.StorageResourceGroupName -Location $location -Tag $config.resourceGroup.tags -WhatIf:$WhatIfPreference
+    if (Test-ToolkitStepSkipped -Step $storageResourceGroupStep -Message "Stopping deployment because the storage resource group step was skipped.") {
+        return
+    }
 
     $keyVaultResult = Ensure-ToolkitKeyVault `
         -Name $names.KeyVaultName `
@@ -64,6 +71,9 @@ function Invoke-AzureSqlVmToolkitDeployment {
         -Location $location `
         -SubscriptionId $subscriptionId `
         -WhatIf:$WhatIfPreference
+    if (Test-ToolkitStepSkipped -Step $keyVaultResult -Message "Stopping deployment because the Key Vault step was skipped.") {
+        return
+    }
     $effectiveKeyVaultName = $keyVaultResult.VaultName
 
     $currentUserId = Get-ToolkitCurrentPrincipalId -Context $currentContext
@@ -95,6 +105,9 @@ function Invoke-AzureSqlVmToolkitDeployment {
             -IdleTimeoutInMinutes $config.network.publicIp.idleTimeoutInMinutes `
             -SubscriptionId $subscriptionId `
             -WhatIf:$WhatIfPreference
+        if (Test-ToolkitStepSkipped -Step $publicIpStep -Message "Stopping deployment because the requested VM public IP step was skipped.") {
+            return
+        }
         if ($publicIpStep.Detail.Resource) {
             $publicIpId = $publicIpStep.Detail.Resource.Id
         }
@@ -141,7 +154,10 @@ function Invoke-AzureSqlVmToolkitDeployment {
     }
     $vmIdentity = $identityStep.Detail.PrincipalId
 
-    Ensure-ToolkitBastion -Config $config -Names $names -Location $location -SubscriptionId $subscriptionId -WhatIf:$WhatIfPreference | Out-Null
+    $bastionStep = Ensure-ToolkitBastion -Config $config -Names $names -Location $location -SubscriptionId $subscriptionId -WhatIf:$WhatIfPreference
+    if (Test-ToolkitStepSkipped -Step $bastionStep -Message "Bastion setup was skipped; continuing with storage and guest setup.") {
+        Write-ToolkitDetail -Message "Deployment will continue without configured Bastion access."
+    }
 
     $storageResult = Ensure-ToolkitStorage `
         -Config $config `
@@ -151,6 +167,17 @@ function Invoke-AzureSqlVmToolkitDeployment {
         -SubscriptionId $subscriptionId `
         -WhatIf:$WhatIfPreference
 
+    $runGuestSetup = $false
+    if (Test-ToolkitStepSkipped -Step $storageResult.AccountStep -Message "Storage account setup was skipped; guest setup will be skipped.") {
+        Write-ToolkitDeploymentStep -Name "Guest setup" -Status "Skipped" -Message "Storage account was not available, so guest setup and restore-helper upload were skipped." | Out-Null
+    }
+    elseif (Test-ToolkitStepSkipped -Step $storageResult.ShareStep -Message "Storage share setup was skipped; guest setup will be skipped.") {
+        Write-ToolkitDeploymentStep -Name "Guest setup" -Status "Skipped" -Message "Storage share was not available, so guest setup and restore-helper upload were skipped." | Out-Null
+    }
+    else {
+        $runGuestSetup = $true
+    }
+
     if (-not [string]::IsNullOrWhiteSpace([string]$vmIdentity)) {
         Ensure-ToolkitRoleAssignment -ObjectId $vmIdentity -RoleDefinitionName "Key Vault Secrets User" -Scope $keyVaultResult.Resource.ResourceId -WhatIf:$WhatIfPreference | Out-Null
     }
@@ -158,7 +185,9 @@ function Invoke-AzureSqlVmToolkitDeployment {
         Write-ToolkitWarning -Message "VM identity principal ID was not available; skipping Key Vault Secrets User assignment."
     }
 
-    Ensure-ToolkitGuestSetup -Config $config -Names $names -KeyVaultName $effectiveKeyVaultName -StorageContext $storageResult.Context -WhatIf:$WhatIfPreference | Out-Null
+    if ($runGuestSetup) {
+        Ensure-ToolkitGuestSetup -Config $config -Names $names -KeyVaultName $effectiveKeyVaultName -StorageContext $storageResult.Context -WhatIf:$WhatIfPreference | Out-Null
+    }
 
     $stopwatch.Stop()
     Write-ToolkitSuccess -Message "Deployment completed in $($stopwatch.Elapsed.ToString('hh\:mm\:ss'))."

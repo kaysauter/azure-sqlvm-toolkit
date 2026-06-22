@@ -22,8 +22,9 @@ The script:
 Install optional local test tooling:
 
 ```powershell
-Install-Module -Name Pester -Scope CurrentUser -Force -SkipPublisherCheck
-Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force
+Install-Module -Name powershell-yaml -RequiredVersion 0.4.12 -Scope CurrentUser -Force
+Install-Module -Name Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -SkipPublisherCheck
+Install-Module -Name PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser -Force
 ```
 
 GitHub Actions runs the same local check for toolkit script/config/test changes, and also runs the docs build plus `npm audit`.

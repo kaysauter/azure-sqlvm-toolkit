@@ -304,6 +304,23 @@
           "items": {
             "type": "object",
             "additionalProperties": false,
+            "allOf": [
+              {
+                "if": {
+                  "properties": {
+                    "manager": {
+                      "const": "PowerShellGallery"
+                    }
+                  },
+                  "required": ["manager"]
+                },
+                "then": {
+                  "not": {
+                    "required": ["sha256"]
+                  }
+                }
+              }
+            ],
             "required": ["manager", "name", "version"],
             "properties": {
               "manager": {
@@ -319,11 +336,13 @@
                 "pattern": "^[A-Za-z0-9._+-]{1,64}$"
               },
               "sha256": {
-                "$ref": "#/$defs/sha256"
+                "$ref": "#/$defs/sha256",
+                "description": "Chocolatey packages only. The generated choco command passes this value through as a SHA-256 checksum."
               },
               "sourceUri": {
                 "type": "string",
-                "format": "uri"
+                "format": "uri",
+                "description": "Review/provenance reference only. This URI is not used as the install source."
               }
             }
           }

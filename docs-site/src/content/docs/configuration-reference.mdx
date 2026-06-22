@@ -91,8 +91,8 @@ Do not put passwords in YAML.
 | `softwareInstalls.packages[].manager` | Package manager. Allowed values are `Chocolatey` and `PowerShellGallery`. |
 | `softwareInstalls.packages[].name` | Package name. |
 | `softwareInstalls.packages[].version` | Required pinned package version. |
-| `softwareInstalls.packages[].sha256` | Optional SHA-256 value for packages where direct checksum verification is available. |
-| `softwareInstalls.packages[].sourceUri` | Optional package source/reference URI for review. |
+| `softwareInstalls.packages[].sha256` | Optional SHA-256 value for Chocolatey packages only. The generated command passes it to `choco install` as a SHA-256 checksum. |
+| `softwareInstalls.packages[].sourceUri` | Optional package source/reference URI for review. It is not used as the install source. |
 | `softwareInstalls.installScript` | Additional trusted PowerShell executed inside the VM after structured package installs. |
 | `softwareInstalls.logonScript` | Optional trusted PowerShell registered for the configured user at logon. |
 

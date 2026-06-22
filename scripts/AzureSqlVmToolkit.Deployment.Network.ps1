@@ -362,6 +362,18 @@ function Ensure-ToolkitBastion {
         [scriptblock]$NewBastion = {
             param($ResourceGroupName, $Name, $PublicIpAddressName, $VirtualNetworkName, $Sku)
             New-AzBastion -ResourceGroupName $ResourceGroupName -Name $Name -PublicIpAddressRgName $ResourceGroupName -PublicIpAddressName $PublicIpAddressName -VirtualNetworkRgName $ResourceGroupName -VirtualNetworkName $VirtualNetworkName -Sku $Sku
+        },
+        [scriptblock]$EnsurePublicIpAddress = {
+            param($Name, $ResourceGroupName, $Location, $AllocationMethod, $IdleTimeoutInMinutes, $Sku, $SubscriptionId, $WhatIfEnabled)
+            Ensure-ToolkitPublicIpAddress `
+                -Name $Name `
+                -ResourceGroupName $ResourceGroupName `
+                -Location $Location `
+                -AllocationMethod $AllocationMethod `
+                -IdleTimeoutInMinutes $IdleTimeoutInMinutes `
+                -Sku $Sku `
+                -SubscriptionId $SubscriptionId `
+                -WhatIf:$WhatIfEnabled
         }
     )
 
@@ -397,15 +409,19 @@ function Ensure-ToolkitBastion {
         Assert-ToolkitNoBlockingDrift -Result $subnetDrift
     }
 
-    $pipStep = Ensure-ToolkitPublicIpAddress `
-        -Name $Names.BastionPipName `
-        -ResourceGroupName $Names.ResourceGroupName `
-        -Location $Location `
-        -AllocationMethod $Config.bastion.publicIp.allocationMethod `
-        -IdleTimeoutInMinutes $Config.bastion.publicIp.idleTimeoutInMinutes `
-        -Sku $Config.bastion.publicIp.sku `
-        -SubscriptionId $SubscriptionId `
-        -WhatIf:$WhatIfPreference
+    $resourceId = Get-ToolkitPredictedResourceId -SubscriptionId $SubscriptionId -ResourceGroupName $Names.ResourceGroupName -ProviderPath "Microsoft.Network/bastionHosts/$($Names.BastionName)"
+    $pipStep = & $EnsurePublicIpAddress `
+        $Names.BastionPipName `
+        $Names.ResourceGroupName `
+        $Location `
+        $Config.bastion.publicIp.allocationMethod `
+        $Config.bastion.publicIp.idleTimeoutInMinutes `
+        $Config.bastion.publicIp.sku `
+        $SubscriptionId `
+        $WhatIfPreference
+    if (Test-ToolkitStepSkipped -Step $pipStep -Message "Bastion public IP setup was skipped, so Bastion creation was skipped.") {
+        return Write-ToolkitDeploymentStep -Name "Bastion" -Status "Skipped" -Message "Bastion public IP was not available." -ResourceId $resourceId -Detail @{ PublicIp = $pipStep }
+    }
 
     $bastion = & $GetBastion $Names.ResourceGroupName $Names.BastionName
     if ($bastion) {
@@ -415,7 +431,6 @@ function Ensure-ToolkitBastion {
         return Write-ToolkitDeploymentStep -Name "Bastion" -Status "Reused" -Message "'$($Names.BastionName)' already exists." -ResourceId $bastion.Id -Detail @{ Resource = $bastion; PublicIp = $pipStep }
     }
 
-    $resourceId = Get-ToolkitPredictedResourceId -SubscriptionId $SubscriptionId -ResourceGroupName $Names.ResourceGroupName -ProviderPath "Microsoft.Network/bastionHosts/$($Names.BastionName)"
     if ($WhatIfPreference) {
         return Write-ToolkitDeploymentStep -Name "Bastion" -Status "WouldCreate" -Message "Would create '$($Names.BastionName)'." -ResourceId $resourceId -Detail @{ PublicIp = $pipStep }
     }
@@ -428,4 +443,3 @@ function Ensure-ToolkitBastion {
 
     return Write-ToolkitDeploymentStep -Name "Bastion" -Status "Skipped" -Message "'$($Names.BastionName)' was not created." -ResourceId $resourceId
 }
-

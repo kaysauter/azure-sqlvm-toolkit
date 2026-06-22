@@ -284,11 +284,15 @@ function Test-ToolkitConfig {
     foreach ($package in @(Get-ToolkitConfigValue -Config $Config -Path "softwareInstalls.packages")) {
         if ($null -eq $package) { continue }
         Test-AllowedValue -Value (Get-ToolkitConfigValue -Config $package -Path "manager" -Required) -Name "softwareInstalls.packages[].manager" -AllowedValues @("Chocolatey", "PowerShellGallery")
+        $manager = Get-ToolkitConfigValue -Config $package -Path "manager" -Required
         Test-NamePattern -Value (Get-ToolkitConfigValue -Config $package -Path "name" -Required) -Name "softwareInstalls.packages[].name" -Pattern '^[A-Za-z0-9._-]{1,128}$' -MaxLength 128
         Test-NamePattern -Value (Get-ToolkitConfigValue -Config $package -Path "version" -Required) -Name "softwareInstalls.packages[].version" -Pattern '^[A-Za-z0-9._+-]{1,64}$' -MaxLength 64
         $sha256 = Get-ToolkitConfigValue -Config $package -Path "sha256"
         if ($null -ne $sha256 -and [string]$sha256 -notmatch '^[A-Fa-f0-9]{64}$') {
             throw "softwareInstalls.packages[].sha256 must be a SHA-256 hex digest."
+        }
+        if ($null -ne $sha256 -and [string]$manager -eq "PowerShellGallery") {
+            throw "softwareInstalls.packages[].sha256 is only supported for Chocolatey packages."
         }
     }
 

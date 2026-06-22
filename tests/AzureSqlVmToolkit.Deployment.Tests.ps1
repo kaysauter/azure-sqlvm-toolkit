@@ -13,6 +13,15 @@ BeforeAll {
                     idleTimeoutInMinutes = 4
                 }
             }
+            bastion          = @{
+                subnetAddressPrefix = "192.168.2.0/24"
+                sku                 = "Basic"
+                publicIp            = @{
+                    allocationMethod     = "Static"
+                    idleTimeoutInMinutes = 4
+                    sku                  = "Standard"
+                }
+            }
             securityRules    = @(
                 @{
                     name                     = "allow-app"
@@ -280,14 +289,69 @@ Describe "Deployment Ensure functions" {
 
         $result.Status | Should -Be "Skipped"
     }
+
+    It "skips Bastion creation when the Bastion public IP step is skipped" {
+        $config = Get-DeploymentTestConfig
+        $names = [pscustomobject]@{
+            ResourceGroupName  = "toolkit-rg"
+            VnetName           = "toolkit-rg-vnet"
+            BastionSubnetName  = "AzureBastionSubnet"
+            BastionPipName     = "toolkit-rg-bastion-pip"
+            BastionName        = "toolkit-rg-bastion"
+        }
+        $vnet = [pscustomobject]@{
+            Id      = "/subscriptions/000/resourceGroups/toolkit-rg/providers/Microsoft.Network/virtualNetworks/toolkit-rg-vnet"
+            Subnets = @(
+                [pscustomobject]@{
+                    Name          = "AzureBastionSubnet"
+                    AddressPrefix = "192.168.2.0/24"
+                    Id            = "/bastionSubnet"
+                }
+            )
+        }
+
+        $result = Ensure-ToolkitBastion `
+            -Config $config `
+            -Names $names `
+            -Location "switzerlandnorth" `
+            -SubscriptionId "000" `
+            -GetVirtualNetwork { $vnet } `
+            -EnsurePublicIpAddress {
+                param($Name)
+                [pscustomobject]@{
+                    Name       = "Bastion public IP"
+                    Status     = "Skipped"
+                    Message    = "'$Name' was not created."
+                    ResourceId = "/publicIp"
+                    Detail     = @{}
+                }
+            } `
+            -GetBastion { throw "should not query bastion" } `
+            -NewBastion { throw "should not create bastion" }
+
+        $result.Status | Should -Be "Skipped"
+        $result.ResourceId | Should -Be "/subscriptions/000/resourceGroups/toolkit-rg/providers/Microsoft.Network/bastionHosts/toolkit-rg-bastion"
+    }
 }
 
 Describe "Guest install script generation" {
     It "generates pinned package commands from package metadata" {
-        $script = Get-ToolkitGuestInstallScript -Config (Get-DeploymentTestConfig)
+        $config = Get-DeploymentTestConfig
+        $sha256 = "b" * 64
+        $config.softwareInstalls.packages[0]["sha256"] = $sha256
+
+        $script = Get-ToolkitGuestInstallScript -Config $config
 
         $script | Should -Match "choco install git.install --version 2.54.0 -y"
+        $script | Should -Match "--checksum $sha256 --checksum-type sha256"
         $script | Should -Match "Install-Module -Name dbatools -RequiredVersion 2.7.25"
         $script | Should -Match "Import-Module dbatools"
+    }
+
+    It "rejects PowerShell Gallery package SHA-256 values during script generation" {
+        $config = Get-DeploymentTestConfig
+        $config.softwareInstalls.packages[1]["sha256"] = "c" * 64
+
+        { Get-ToolkitGuestInstallScript -Config $config } | Should -Throw -ExpectedMessage "*sha256 is only supported for Chocolatey*"
     }
 }

@@ -162,8 +162,9 @@ The check parses PowerShell files, validates the module manifest, checks `VERSIO
 For the full local check, install the optional test tooling:
 
 ```powershell
-Install-Module -Name Pester -Scope CurrentUser -Force -SkipPublisherCheck
-Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force
+Install-Module -Name powershell-yaml -RequiredVersion 0.4.12 -Scope CurrentUser -Force
+Install-Module -Name Pester -RequiredVersion 5.7.1 -Scope CurrentUser -Force -SkipPublisherCheck
+Install-Module -Name PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser -Force
 ```
 
 ## Not Implemented Yet

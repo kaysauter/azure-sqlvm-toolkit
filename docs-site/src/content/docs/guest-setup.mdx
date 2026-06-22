@@ -21,7 +21,11 @@ softwareInstalls:
       version: "2.7.25"
 ```
 
-The toolkit generates pinned install commands from this metadata. `allowDynamicBootstrap: true` still permits Chocolatey bootstrap download during deployment, so hardened environments should either preinstall Chocolatey in the VM image or provide a verified internal bootstrap source and package mirror.
+The toolkit generates pinned install commands from this metadata. Chocolatey package entries may also include `sha256`; when present, the generated `choco install` command passes it as `--checksum ... --checksum-type sha256`.
+
+`sha256` is intentionally rejected for `PowerShellGallery` packages because the current install path does not enforce a package checksum. `sourceUri` is a review/provenance reference only; it is not used as the install source.
+
+`allowDynamicBootstrap: true` still permits Chocolatey bootstrap download during deployment, so hardened environments should either preinstall Chocolatey in the VM image or provide a verified internal bootstrap source and package mirror.
 
 ## Additional Install Script
 
