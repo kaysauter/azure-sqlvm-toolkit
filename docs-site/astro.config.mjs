@@ -60,6 +60,11 @@ export default defineConfig({
 					items: [
 						{ label: 'Local Testing', slug: 'testing' },
 						{ label: 'Troubleshooting', slug: 'troubleshooting' },
+					],
+				},
+				{
+					label: 'Development',
+					items: [
 						{ label: 'Development', slug: 'development' },
 						{ label: 'Roadmap', slug: 'roadmap' },
 					],

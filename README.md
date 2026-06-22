@@ -156,6 +156,7 @@ These items are documented as goals, not shipped behavior in the tracked toolkit
 - Config-driven local backup upload with manifest generation.
 - Optional First Responder Kit and Ola Hallengren Maintenance Solution installers.
 - More live integration coverage for Azure resource reconciliation.
+- Long-term Bicep and Terraform deployment paths.
 
 ## Licensing
 
