@@ -1,0 +1,155 @@
+---
+title: Sizing And Costs
+description: Discover VM sizes, SQL Server images, and subscription-aware cost estimates before deployment.
+---
+
+AzSQLVMKit includes read-only helper commands for choosing a VM size, choosing a SQL Server image, and estimating monthly cost before deployment.
+
+These helpers use your active Azure PowerShell context. Sign in first:
+
+```powershell
+Connect-AzAccount
+Set-AzContext -SubscriptionName "My Subscription"
+```
+
+## Discover VM Sizes
+
+List available VM sizes for a region:
+
+```powershell
+Get-AzureSqlVmToolkitVmSize -Location "Switzerland North"
+```
+
+Filter to beginner-friendly constraints:
+
+```powershell
+Get-AzureSqlVmToolkitVmSize `
+  -Location "Switzerland North" `
+  -Category GeneralPurpose `
+  -MinVcpu 4 `
+  -MinMemoryGB 16
+```
+
+Output includes:
+
+| Property | Meaning |
+| --- | --- |
+| `Name` | Value to put in `vm.size`. |
+| `Category` | Toolkit grouping such as `Burstable`, `GeneralPurpose`, or `MemoryOptimized`. |
+| `Vcpu` | Virtual CPU count reported by Azure. |
+| `MemoryGB` | Memory in GiB reported by Azure. |
+| `MaxDataDisks` | Maximum data disks for the size. |
+| `PremiumDisk` | Whether the size advertises Premium disk support. |
+| `Restricted` | Whether Azure reports SKU restrictions in the selected region. |
+
+Include subscription-aware VM compute pricing:
+
+```powershell
+Get-AzureSqlVmToolkitVmSize `
+  -Location "Switzerland North" `
+  -Category GeneralPurpose `
+  -MinVcpu 4 `
+  -MinMemoryGB 16 `
+  -IncludeCost
+```
+
+`-IncludeCost` uses the active subscription price sheet and adds `UnitPrice`, `MonthlyEstimate`, `Currency`, and `CostPricingState`.
+
+## Discover SQL Server Images
+
+List SQL Server images for a region:
+
+```powershell
+Get-AzureSqlVmToolkitSqlImage -Location "Switzerland North"
+```
+
+Filter to SQL Server 2022 Developer images:
+
+```powershell
+Get-AzureSqlVmToolkitSqlImage `
+  -Location "Switzerland North" `
+  -SqlVersion 2022 `
+  -Edition Developer
+```
+
+Use the selected image in YAML:
+
+```yaml
+vm:
+  size: "Standard_D4s_v5"
+  image:
+    publisherName: "MicrosoftSQLServer"
+    offer: "sql2022-ws2022"
+    skus: "sqldev-gen2"
+    version: "latest"
+```
+
+Before using any SQL Server image, review [Licensing](/azure-sqlvm-toolkit/licensing/) and the linked Microsoft terms for your scenario.
+
+## Estimate Cost
+
+Generate structured cost objects:
+
+```powershell
+Get-AzureSqlVmToolkitCostEstimate -ConfigFile .\config.local.yaml
+```
+
+Export a local Markdown report:
+
+```powershell
+Export-AzureSqlVmToolkitCostEstimate `
+  -ConfigFile .\config.local.yaml `
+  -OutputPath .\cost-estimate.local.md
+```
+
+The repository ignores `*.local.md`, so `cost-estimate.local.md` is a good place for subscription-specific planning output.
+
+The report includes:
+
+- active subscription name and masked subscription ID
+- region
+- pricing source
+- monthly hours
+- per-component estimate rows
+- a total for matched price-sheet items
+- warnings for usage-based or not-yet-modeled costs
+
+## What The Total Means
+
+The total is intentionally labeled as:
+
+> Estimated monthly total for matched price-sheet items
+
+That means the toolkit only adds items when it can match a price-sheet meter with enough confidence. The current estimate can include VM compute and Azure Bastion hourly meters when those meters are found.
+
+The total may not include:
+
+- Azure Files consumed GiB
+- Azure Files transactions
+- SQL backups, local backup uploads, and backup growth
+- snapshots
+- VM disks that are not explicitly modeled yet
+- bandwidth and egress
+- taxes
+- credits
+- reservations
+- savings plans
+- future price changes
+- SQL Server licensing differences between editions
+
+Use the report as a planning tool, then verify expected cost in Azure Cost Management for real environments.
+
+## Pricing Source
+
+The cost helpers use the authenticated Azure Consumption Price Sheet API through `Invoke-AzRestMethod`. This uses your active Azure context and subscription from `Connect-AzAccount`.
+
+The toolkit does not use public retail pricing by default because public retail prices may not reflect your subscription agreement, currency, discounts, or offer type.
+
+References:
+
+- [Azure Consumption Price Sheet API](https://learn.microsoft.com/en-us/rest/api/consumption/price-sheet/get?view=rest-consumption-2024-08-01)
+- [Invoke-AzRestMethod](https://learn.microsoft.com/en-us/powershell/module/az.accounts/invoke-azrestmethod)
+- [Azure Retail Prices API](https://learn.microsoft.com/en-us/rest/api/cost-management/retail-prices/azure-retail-prices)
+- [Get-AzComputeResourceSku](https://learn.microsoft.com/en-us/powershell/module/az.compute/get-azcomputeresourcesku)
+- [Get-AzVMImageOffer](https://learn.microsoft.com/en-us/powershell/module/az.compute/get-azvmimageoffer)
+- [Get-AzVMImageSku](https://learn.microsoft.com/en-us/powershell/module/az.compute/get-azvmimagesku)

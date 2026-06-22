@@ -1,0 +1,152 @@
+# Security
+
+Security is a standing quality gate for AzureSqlVmToolkit. The toolkit is currently in beta and heavy development, so it is not production ready yet. The goal for a release after the beta stage is to become production ready with clear Azure, SQL Server, identity, secret-management, and supply-chain guidance.
+
+## Intended scope
+
+Use the current beta deployment model for disposable development environments, workshops, demos, and learning. Before using the toolkit against an environment that matters, review the credential model, network exposure, Key Vault access, guest setup scripts, external downloads, storage keys, and any existing Azure resources that will be reused.
+
+SQL Server and Azure licensing guidance lives in [Licensing](Licensing.md). Treat Microsoft Product Terms and Microsoft Learn as definitive.
+
+The most important habit is to preview before deployment:
+
+```powershell
+New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -Plan
+New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -WhatIf
+```
+
+Add `-GeneratePassword` to those previews only when you intentionally plan to use the toolkit's lab password generator.
+
+## Safer lab defaults
+
+The sample configuration is designed to avoid common exposure:
+
+- VM public IP is disabled
+- Azure Bastion is the intended RDP entry point
+- broad internet-sourced RDP and SQL rules are not configured
+- Key Vault requires RBAC authorization
+- missing VM admin passwords are not generated unless `-GeneratePassword` is explicitly supplied
+- passwords are stored in Key Vault and not printed by default
+
+These defaults reduce common mistakes, but during beta they are not a promise that the resulting environment is production ready.
+
+## Security assessment
+
+Run:
+
+```powershell
+New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -Plan
+```
+
+The assessment flags:
+
+- VM public IP exposure
+- internet-sourced RDP or SQL rules
+- selected existing Azure NIC public IPs and NSG rules when `-WhatIf` or deployment runs with an Azure context
+- non-RBAC Key Vault configuration
+- guest setup scripts that execute downloaded content through `Invoke-Expression`
+- live Chocolatey bootstrap downloads
+- local backup upload, because backups may contain sensitive or production data
+- selected sample database downloads and large sample warnings
+- optional First Responder Kit installation
+- optional Ola Hallengren Maintenance Solution installation and SQL Agent job warnings
+
+The assessment is a guide, not a formal audit. It checks selected config and Azure state signals, but it does not prove that an existing Azure environment is free of drift, policy exceptions, stale role assignments, exposed endpoints, vulnerable software, or unapproved data.
+
+## Network access
+
+The VM is Bastion-first by default. The SQL VM does not receive a public IP unless `network.publicIp.enabled` is set to `true`. Azure Bastion has its own public IP because Bastion is the intended entry point.
+
+Avoid custom NSG rules that expose RDP or SQL Server to `*`, `0.0.0.0/0`, `::/0`, or `Internet`, especially on ports `3389` and `1433`. The toolkit warns about broad inbound RDP and SQL rules in config and, when signed in, selected existing NIC/subnet NSGs. Existing NSGs are still not fully reconciled on rerun, so review existing rules manually before relying on a reused network.
+
+## Config files and local output
+
+Do not put secrets in YAML. Local config files should contain non-secret deployment settings such as project names, regions, suffixes, VM choices, and optional resource-name overrides.
+
+Keep these local-only files out of commits:
+
+- `config.local.yaml`
+- `*.local.yaml`
+- `*.local.md`
+- `.env`
+- generated test output
+- screenshots that reveal Azure account, tenant, subscription, object, IP, or secret values
+
+Use placeholder values in public docs and examples.
+
+## Password generation tradeoff
+
+The toolkit reuses an existing VM admin password secret by default. If the secret is missing, the deployment stops instead of silently creating a password.
+
+If you explicitly pass `-GeneratePassword`, the toolkit generates the VM admin password in PowerShell and stores it in Key Vault. That is better than storing passwords in YAML or printing them by default, but it does not make the password generation model production grade.
+
+Use `-GeneratePassword` only for demos, labs, and beginner learning environments. For production or sensitive environments, generate the VM administrator credential through an approved secret-management process, write it directly to a managed secret store, and rotate it according to your organization's policy.
+
+`-ShowPassword` should only be used for controlled demos. It prints the VM admin password at the end of deployment and increases the chance that the password ends up in terminal scrollback, logs, screenshots, or shared notes.
+
+## Key Vault and identity
+
+Key Vault uses RBAC authorization by default. The toolkit assigns the current signed-in principal permission to manage secrets and grants the VM managed identity access to the storage-key secret. The VM identity does not receive blanket Key Vault administration.
+
+The VM uses a system-assigned managed identity to retrieve the storage-key secret during guest setup. This avoids embedding the storage key in scripts, but the retrieved key is still powerful and must be treated as sensitive.
+
+## Key Vault RBAC requirement
+
+AzureSqlVmToolkit no longer supports legacy Key Vault access-policy mode. New Key Vaults are created with RBAC authorization, and existing Key Vaults must already use RBAC authorization.
+
+If a config sets `keyVault.useRbacAuthorization: false`, validation fails before deployment. If an existing vault with the resolved name uses legacy access policies, deployment stops and asks you to migrate the vault to RBAC authorization, use a different RBAC-enabled vault, or choose a new Key Vault name.
+
+## Storage key tradeoff
+
+The VM receives access to a Key Vault secret containing the storage account key so it can mount Azure Files. Key Vault access is scoped, but the key itself is powerful.
+
+Rotate storage account keys if they may have been exposed. For production-grade environments, evaluate identity-based Azure Files access or narrower storage patterns instead of long-lived account keys where practical.
+
+## Local backup uploads
+
+`localBackups` can upload local SQL Server backup files to the Azure Files share. Treat those files as sensitive data. They may contain production data, personal data, credentials stored inside databases, or local workstation path names in the generated manifest.
+
+The toolkit creates a new timestamped upload folder and refuses to overwrite existing uploaded backup files. It also generates `restore-local-backups.ps1`, but does not run it automatically. You must log into the VM, review the preview output, and pass `-Execute` yourself.
+
+This manual step is intentional for v1. It avoids automatic restores through Azure VM Run Command, Custom Script Extension, scheduled tasks, or other mechanisms that could run database restore work as the VM SYSTEM account.
+
+`localBackups.replaceExisting` defaults to `false`. Set it to `true` only when you intentionally want the generated restore script to use dbatools overwrite behavior against existing databases.
+
+## Supply chain notes
+
+The sample guest setup downloads the Chocolatey bootstrap script to disk before executing it. This is safer than piping downloaded content through `Invoke-Expression`, but production deployments should pin or verify installer content.
+
+The default package installation also uses unpinned package versions. For production or repeatable demos, consider pinning versions and checksums.
+
+Optional sample database installation uses a code-defined allowlist instead of arbitrary URLs. This keeps the deployment command beginner-friendly without making it a general remote-download runner. Review each sample source, license, attribution requirement, and size before enabling `-InstallSampleDb`.
+
+Optional First Responder Kit installation uses dbatools to download and run Brent Ozar Unlimited's upstream SQL scripts. Keep it opt-in, review the source and release notes, and prefer a pinned/internal copy for production-grade repeatability.
+
+Optional Ola Hallengren Maintenance Solution installation uses dbatools to download and run upstream SQL scripts. SQL Agent jobs are separate opt-in because backup, integrity-check, and index-maintenance jobs can affect runtime, storage, and SQL Server workload behavior.
+
+## Existing resources and drift
+
+The toolkit reuses existing resources when it finds them. Full drift correction is not implemented yet. Connected WhatIf/deployment runs now flag selected existing NIC public IPs and broad inbound RDP/SQL NSG rules, but the toolkit does not currently rewrite every existing NSG rule, resize existing VMs, change existing images, change every Bastion setting, or fully reconcile storage account settings.
+
+Before rerunning against an environment that matters, manually review:
+
+- NSG rules and public IP exposure
+- Key Vault authorization mode and role assignments
+- VM managed identity state
+- storage account keys and file share access
+- existing SQL Server configuration
+- optional SQL Agent jobs installed by community tools
+
+## Production readiness checklist
+
+Before using any part of the current beta outside a disposable lab, decide how you will handle:
+
+- approved VM credential generation and rotation
+- Key Vault RBAC ownership and break-glass access
+- network segmentation and inbound rule review
+- storage-key rotation or identity-based Azure Files alternatives
+- package pinning, checksum verification, or internal mirrors
+- sample database and third-party script approvals
+- audit logging, Azure Policy, Defender for Cloud, backup, and patching
+
+Future improvements may include identity-based Azure Files auth or narrower storage access patterns where practical.

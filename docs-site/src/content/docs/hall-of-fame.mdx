@@ -1,0 +1,166 @@
+---
+title: Hall of Fame
+description: People and communities whose work AzSQLVMKit stands on.
+---
+
+AzSQLVMKit is a small project built on a very large community. This page is for the people whose public work, tools, scripts, samples, teaching, and community care make the toolkit possible or meaningfully better.
+
+This is not the license page. For license signals, upstream source links, and package notices, see [Third-party Notices](/azure-sqlvm-toolkit/third-party-notices/).
+
+:::note[Living credits page]
+This page is intentionally people-first and will grow over time. It focuses first on named creators and maintainers connected to the toolkit's current features. Broad platform teams and community projects are still credited in Third-party Notices even when a single person would be the wrong attribution.
+:::
+
+## Alberto Ferrari And Marco Russo
+
+Alberto Ferrari and Marco Russo created SQLBI and have taught a generation of data professionals how to think about DAX, Power BI, Analysis Services, and tabular models. AzSQLVMKit includes the SQLBI Contoso sample as an optional database, and the docs also point users toward BI-oriented tooling such as Tabular Editor.
+
+Their work matters here because SQL Server VM labs often become BI labs very quickly. A good sample database is not only data; it is a teaching surface for modeling, querying, performance, and reporting.
+
+Links:
+
+- [SQLBI](https://www.sqlbi.com/)
+- [SQLBI tools](https://www.sqlbi.com/tools/)
+- [Contoso Data Generator](https://www.sqlbi.com/tools/contoso-data-generator/)
+- [Contoso Data Generator GitHub](https://github.com/sql-bi/Contoso-Data-Generator-V2)
+- [Alberto Ferrari profile](https://www.sqlbi.com/author/alberto-ferrari/)
+- [Alberto's blog](https://www.sqlbi.com/blog/alberto/)
+- [Alberto on LinkedIn](https://www.linkedin.com/in/albertoferrarisqlbi)
+- [Marco Russo profile](https://www.sqlbi.com/author/marco-russo/)
+- [Marco's blog](https://www.sqlbi.com/blog/marco/)
+- [Marco on LinkedIn](https://www.linkedin.com/in/sqlbi)
+- [Marco on X / Twitter](https://x.com/marcorus)
+
+## Ola Hallengren
+
+Ola Hallengren's SQL Server Maintenance Solution is a long-standing community standard for backups, integrity checks, and index/statistics maintenance. AzSQLVMKit can install it as an optional community tool, while keeping SQL Agent jobs as a separate opt-in because maintenance jobs have real operational consequences.
+
+Ola's work is a reminder that boring, reliable database operations are a serious craft. For a project that creates SQL Server VMs, that matters just as much as the deployment itself.
+
+Links:
+
+- [Ola Hallengren's SQL Server Maintenance Solution](https://ola.hallengren.com/)
+- [Maintenance Solution GitHub](https://github.com/olahallengren/sql-server-maintenance-solution)
+- [Frequently Asked Questions](https://ola.hallengren.com/frequently-asked-questions.html)
+- [Contact and support guidance](https://ola.hallengren.com/contact.html)
+
+## Daniel Hutmacher
+
+Daniel Hutmacher publishes SQL Server resources through SQL Sunday and Structured Concepts. AzSQLVMKit uses his Chicago sample backup as one of the optional sample databases, which gives users a larger and more realistic dataset to restore, inspect, and query.
+
+Daniel's public work also models something important for this project: practical database craft, shared openly, with enough context that other people can learn by doing rather than only reading.
+
+Links:
+
+- [SQL Sunday](https://sqlsunday.com/)
+- [SQL Sunday downloads](https://sqlsunday.com/downloads/)
+- [Daniel's about page](https://sqlsunday.com/about/)
+- [Structured Concepts](https://strd.co/)
+- [Daniel on GitHub](https://github.com/danhutmacher)
+- [Daniel on Bluesky](https://bsky.app/profile/sqlsunday.com)
+- [Daniel on LinkedIn](https://www.linkedin.com/in/danielhutmacher/)
+- [Daniel on Mastodon](https://dataplatform.social/@sqlsunday)
+
+## Chrissy LeMaire
+
+Chrissy LeMaire created `dbatools`, one of the most useful PowerShell projects in the SQL Server ecosystem. AzSQLVMKit uses `dbatools` for database restore and optional SQL community-tool installation paths, so the toolkit benefits directly from the API shape, documentation, and community norms that Chrissy and the maintainers built.
+
+The impact here is bigger than one module import. `dbatools` is one of the reasons SQL Server administration feels scriptable, repeatable, and approachable from PowerShell. That spirit is very close to what AzSQLVMKit is trying to do for beginner-friendly Azure SQL VM labs.
+
+Links:
+
+- [dbatools](https://dbatools.io/)
+- [dbatools team page](https://dbatools.io/team/)
+- [dbatools GitHub](https://github.com/dataplat/dbatools)
+- [Chrissy's blog](https://blog.netnerds.net/)
+- [Chrissy on GitHub](https://github.com/potatoqualitee)
+- [Chrissy on Bluesky](https://bsky.app/profile/potatoqualitee.com)
+- [Chrissy on LinkedIn](https://www.linkedin.com/in/chrissylemaire)
+
+## Daniel Otykier
+
+Daniel Otykier created Tabular Editor. AzSQLVMKit's default guest setup can install Tabular Editor through Chocolatey because many SQL Server learning environments eventually touch Analysis Services, Power BI semantic models, or tabular-model workflows.
+
+Tabular Editor is an example of a focused tool that changed day-to-day practice for BI developers. It belongs in this Hall of Fame because the toolkit aims to make that kind of practical tooling available in a lab VM without turning setup into the main lesson.
+
+Links:
+
+- [Tabular Editor](https://tabulareditor.com/)
+- [Tabular Editor team page](https://tabulareditor.com/about-us/meet-the-team)
+- [Tabular Editor 2.x GitHub](https://github.com/TabularEditor/TabularEditor)
+- [Tabular Editor documentation](https://docs.tabulareditor.com/)
+- [Daniel on GitHub](https://github.com/otykier)
+- [Daniel on X / Twitter](https://x.com/DOtykier)
+- [Daniel on LinkedIn](https://www.linkedin.com/in/dotykier)
+
+## Brent Ozar
+
+Brent Ozar's First Responder Kit is one of the most recognizable free SQL Server diagnostic toolkits. AzSQLVMKit can install it as an optional SQL community tool, giving lab users a practical way to explore health checks, query analysis, index review, and performance troubleshooting concepts.
+
+The toolkit also benefits from Brent's long-running use of Stack Overflow public data for training. The optional `StackOverflowMini` sample follows that teaching pattern: real-ish data, enough shape to learn from, and a SQL Server context that rewards curiosity.
+
+Links:
+
+- [BrentOzar.com](https://www.brentozar.com/)
+- [First Responder Kit download page](https://www.brentozar.com/first-aid/)
+- [First Responder Kit GitHub](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit)
+- [Stack Overflow Database GitHub](https://github.com/BrentOzarULTD/Stack-Overflow-Database)
+- [Brent on Stack Overflow](https://stackoverflow.com/users/26837/brent-ozar)
+- [Brent on GitHub](https://github.com/BrentOzarULTD)
+- [Brent on X / Twitter](https://x.com/BrentO)
+
+## Igor Pavlov
+
+Igor Pavlov created 7-Zip. AzSQLVMKit uses 7-Zip through Chocolatey when selected sample databases arrive as `.7z` archives, such as SQLBI Contoso.
+
+This is one of those quiet dependencies that only becomes visible when it is missing. Compression tooling is not glamorous, but it is part of what makes large sample data practical to move around.
+
+Links:
+
+- [7-Zip](https://www.7-zip.org/)
+- [7-Zip license page](https://www.7-zip.org/license.txt)
+- [7-Zip downloads](https://www.7-zip.org/download.html)
+
+## Rob Reynolds
+
+Rob Reynolds founded Chocolatey. AzSQLVMKit's guest setup uses Chocolatey for several VM-side tools, which makes the Windows software installation story much simpler for demos and labs.
+
+Chocolatey is not the final word for every production supply-chain model, and the security docs say so plainly. But for a beginner-friendly lab VM, it removes a lot of manual setup and gives users a familiar package-management workflow on Windows.
+
+Links:
+
+- [Chocolatey](https://chocolatey.org/)
+- [About Chocolatey Software](https://chocolatey.org/about)
+- [Chocolatey documentation](https://docs.chocolatey.org/)
+- [Chocolatey GitHub](https://github.com/chocolatey)
+- [Rob Reynolds on LinkedIn](https://www.linkedin.com/in/robreynolds)
+
+## Microsoft
+
+Microsoft is a company rather than an individual person, so this mention comes after the alphabetized people, but it still belongs here. Microsoft created and maintains PowerShell, SQL Server, Azure, the SQL Server on Azure VMs platform, and the documentation and sample-database ecosystem that AzSQLVMKit depends on. The toolkit is PowerShell-first and SQL Server VM-focused, so this credit belongs to the Microsoft product teams, docs teams, open-source maintainers, and community contributors who make those platforms practical for automation, learning, demos, and repeatable lab work.
+
+Links:
+
+- [Microsoft](https://www.microsoft.com/)
+- [Microsoft GitHub](https://github.com/microsoft)
+- [PowerShell GitHub](https://github.com/PowerShell/PowerShell)
+- [PowerShell documentation](https://learn.microsoft.com/powershell/)
+- [PowerShell Gallery](https://www.powershellgallery.com/)
+- [PowerShell Team blog](https://devblogs.microsoft.com/powershell/)
+- [SQL Server documentation](https://learn.microsoft.com/sql/sql-server/)
+- [SQL Server on Azure VMs documentation](https://learn.microsoft.com/azure/azure-sql/virtual-machines/)
+- [SQL Server samples GitHub](https://github.com/microsoft/sql-server-samples)
+- [SQL Server docs GitHub](https://github.com/MicrosoftDocs/sql-docs)
+- [AdventureWorks sample docs](https://learn.microsoft.com/sql/samples/adventureworks-install-configure)
+- [Wide World Importers sample docs](https://learn.microsoft.com/sql/samples/wide-world-importers-oltp-install-configure)
+
+## Communities And Teams
+
+Some foundations are bigger than one name. AzSQLVMKit also stands on:
+
+- the Microsoft SQL Server samples team, especially AdventureWorks and WideWorldImporters
+- Stack Overflow and Stack Exchange contributors, whose public data makes realistic SQL Server training possible
+- the Git, GitHub, and Git for Windows communities
+- the Azure, SQL Server, PowerShell, and open-source documentation communities
+
+Those credits stay in [Third-party Notices](/azure-sqlvm-toolkit/third-party-notices/) where the project/source/license view is easier to maintain.

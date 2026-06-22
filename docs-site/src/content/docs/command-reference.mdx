@@ -1,0 +1,401 @@
+---
+title: Command Reference
+description: Public PowerShell commands exported by AzSQLVMKit.
+---
+
+The module exports eleven public functions. Internal helper functions live under `Private/` and are not part of the public API.
+
+Import the module before running commands:
+
+```powershell
+Import-Module .\AzureSqlVmToolkit.psd1 -Force
+```
+
+Check that it is imported in the current PowerShell session:
+
+```powershell
+Get-Module -Name AzureSqlVmToolkit
+```
+
+Check that PowerShell can see the exported commands:
+
+```powershell
+Get-Command -Module AzureSqlVmToolkit
+```
+
+Check whether the module is installed on your module path:
+
+```powershell
+Get-Module -ListAvailable -Name AzureSqlVmToolkit
+```
+
+When developing from this repository, an empty `Get-Module -ListAvailable` result is fine. Import the manifest by path instead.
+
+Use the checks this way:
+
+- `Get-Module -Name AzureSqlVmToolkit` checks the current session.
+- `Get-Module -ListAvailable -Name AzureSqlVmToolkit` checks installed or copied modules on the module path.
+- `Get-Command -Module AzureSqlVmToolkit` shows the exported toolkit commands.
+
+Do not confuse this with:
+
+```powershell
+Install-Module -Name Az -Scope CurrentUser -Force
+```
+
+`Az` is the Azure PowerShell dependency. It does not install `AzureSqlVmToolkit`.
+
+## `Get-AzureSqlVmToolkitVmSize`
+
+Lists Azure VM sizes available in a region, with beginner-friendly category, vCPU, memory, data-disk, Premium disk, restriction, and optional cost fields.
+
+```powershell
+Get-AzureSqlVmToolkitVmSize `
+  -Location "Switzerland North" `
+  [-Category GeneralPurpose] `
+  [-MinVcpu 4] `
+  [-MinMemoryGB 16] `
+  [-IncludeRestricted] `
+  [-IncludeCost] `
+  [-MonthlyHours 730]
+```
+
+Parameters:
+
+| Parameter | Default | Notes |
+| --- | --- | --- |
+| `Location` | required | Azure region display name or location name. |
+| `Category` | all | Optional toolkit category filter. |
+| `MinVcpu` | `0` | Minimum virtual CPU count. |
+| `MinMemoryGB` | `0` | Minimum memory in GiB. |
+| `IncludeRestricted` | off | Include sizes where Azure reports SKU restrictions. |
+| `IncludeCost` | off | Adds subscription-aware price-sheet estimate fields. Requires Azure context. |
+| `MonthlyHours` | `730` | Hours used for monthly estimates. |
+
+Example:
+
+```powershell
+Get-AzureSqlVmToolkitVmSize `
+  -Location "Switzerland North" `
+  -Category GeneralPurpose `
+  -MinVcpu 4 `
+  -MinMemoryGB 16 `
+  -IncludeCost
+```
+
+## `Get-AzureSqlVmToolkitSqlImage`
+
+Lists SQL Server VM images available in a region.
+
+```powershell
+Get-AzureSqlVmToolkitSqlImage `
+  -Location "Switzerland North" `
+  [-SqlVersion 2022] `
+  [-Edition Developer] `
+  [-Offer "sql2022-ws2022"] `
+  [-PublisherName "MicrosoftSQLServer"]
+```
+
+Parameters:
+
+| Parameter | Default | Notes |
+| --- | --- | --- |
+| `Location` | required | Azure region display name or location name. |
+| `SqlVersion` | all | Filters offers such as SQL Server 2022. |
+| `Edition` | all | Filters inferred edition: `Developer`, `Express`, `Web`, `Standard`, `Enterprise`, or `Unknown`. |
+| `Offer` | all SQL offers | Exact Azure image offer filter. |
+| `PublisherName` | `MicrosoftSQLServer` | Azure Marketplace publisher. |
+
+Before using a SQL Server image, review [Licensing](/azure-sqlvm-toolkit/licensing/) and the linked Microsoft terms.
+
+## `Get-AzureSqlVmToolkitCostEstimate`
+
+Returns structured cost estimate data for a config file.
+
+```powershell
+Get-AzureSqlVmToolkitCostEstimate `
+  [-ConfigFile .\config.local.yaml] `
+  [-MonthlyHours 730]
+```
+
+The command uses the active Azure subscription from `Connect-AzAccount` and the Azure Consumption Price Sheet API. It returns estimate metadata, component rows, warnings, and `EstimatedMonthlyTotal`.
+
+The total includes only matched price-sheet items. Usage-based or not-yet-modeled costs are listed separately and excluded from the total.
+
+## `Export-AzureSqlVmToolkitCostEstimate`
+
+Writes a Markdown cost estimate report.
+
+```powershell
+Export-AzureSqlVmToolkitCostEstimate `
+  -ConfigFile .\config.local.yaml `
+  -OutputPath .\cost-estimate.local.md
+```
+
+Parameters:
+
+| Parameter | Default | Notes |
+| --- | --- | --- |
+| `ConfigFile` | `config.yaml` | YAML config to estimate. |
+| `Config` | none | In-memory config object. |
+| `Estimate` | none | Existing estimate object from `Get-AzureSqlVmToolkitCostEstimate`. |
+| `OutputPath` | `.\cost-estimate.local.md` | Markdown file to write. Prefer ignored `*.local.md` files. |
+| `MonthlyHours` | `730` | Hours used when generating a new estimate. |
+| `Force` | off | Overwrite an existing output file. |
+
+The report includes a total, per-component rows, pricing source, masked subscription ID, and not-included warnings.
+
+## `Import-AzureSqlVmToolkitConfig`
+
+Reads a YAML config file and returns the parsed object.
+
+```powershell
+Import-AzureSqlVmToolkitConfig [-ConfigFile <string>]
+```
+
+Parameters:
+
+| Parameter | Default | Notes |
+| --- | --- | --- |
+| `ConfigFile` | `config.yaml` | Relative paths are resolved from the module root. Absolute paths are accepted. |
+
+Behavior:
+
+- Requires `powershell-yaml`; install it explicitly before importing YAML configs.
+- Throws if the config file cannot be found.
+- Returns the YAML content as a PowerShell object.
+
+## `Get-AzureSqlVmToolkitSampleDatabase`
+
+Lists the allowlisted sample databases that can be installed with `-InstallSampleDb`.
+
+```powershell
+Get-AzureSqlVmToolkitSampleDatabase
+```
+
+Output includes:
+
+| Property | Meaning |
+| --- | --- |
+| `Name` | Value to pass to `-InstallSampleDb`. |
+| `DatabaseName` | Expected database name after restore. |
+| `Publisher` | Sample database publisher. |
+| `Source` | Repository or source site. |
+| `MinimumSqlServerVersion` | Minimum SQL Server version documented by the source or assumed by the toolkit. |
+| `Size` | Relative size label used for beginner warnings. |
+| `ArchiveKind` | `Bak` or `7z`. |
+| `License` | Short reminder; always review the source license yourself. |
+| `Uri` | Download URL used by the toolkit. |
+
+## `Resolve-AzureSqlVmToolkitNames`
+
+Resolves all generated Azure names without creating resources.
+
+```powershell
+Resolve-AzureSqlVmToolkitNames [-ConfigFile <string>] [-Config <object>]
+```
+
+Parameters:
+
+| Parameter | Default | Notes |
+| --- | --- | --- |
+| `ConfigFile` | `config.yaml` | Used when `Config` is not supplied. |
+| `Config` | none | Pass an in-memory config object, usually for tests. |
+
+Output includes resource group, storage resource group, VNet, subnet, NSG, NIC, VM, computer name, Bastion, Key Vault, storage account, file share, location, unique suffix, and name-source metadata.
+
+## `Test-AzureSqlVmToolkitConfig`
+
+Validates the config shape and resolved names.
+
+```powershell
+Test-AzureSqlVmToolkitConfig [-ConfigFile <string>] [-Config <object>]
+```
+
+Returns validation items with:
+
+| Property | Meaning |
+| --- | --- |
+| `Severity` | `Error`, `Warning`, or `Info` |
+| `Field` | Config field or area |
+| `Message` | What was found |
+| `Advice` | How to fix or interpret it |
+
+Current checks include required project/location values, storage account naming rules, Key Vault naming rules, Windows computer-name limits, drive-letter format, legacy config detection, and generated suffix notices.
+
+## `Test-AzureSqlVmToolkitSecurity`
+
+Runs the security assessment logic without deploying resources.
+
+```powershell
+Test-AzureSqlVmToolkitSecurity `
+  [-ConfigFile <string>] `
+  [-Config <object>] `
+  [-GeneratePassword] `
+  [-ShowPassword]
+```
+
+Use `-GeneratePassword` and `-ShowPassword` here when you want the assessment output to reflect the deployment flags you plan to use.
+
+Returns assessment items with:
+
+| Property | Meaning |
+| --- | --- |
+| `Severity` | `High`, `Medium`, `Low`, or `Info` |
+| `Surface` | Area being assessed |
+| `Finding` | What was found |
+| `Advice` | Recommended action |
+
+The assessment currently checks VM public IP exposure, broad inbound RDP or SQL rules, Key Vault RBAC mode, downloaded installer execution patterns, password-generation posture, and password-printing posture. It reminds users that `-GeneratePassword` uses the PowerShell-side lab generator and is not a production-grade secret workflow.
+
+## `Write-AzureSqlVmToolkitSecurityAssessment`
+
+Formats assessment items for console output.
+
+```powershell
+Write-AzureSqlVmToolkitSecurityAssessment -Assessment <object[]>
+```
+
+This command is useful if you call `Test-AzureSqlVmToolkitSecurity` directly and want the same console formatting used by deployment previews.
+
+## `New-AzureSqlVmToolkitDeployment`
+
+Main deployment command.
+
+```powershell
+New-AzureSqlVmToolkitDeployment `
+  [-ConfigFile <string>] `
+  [-SecurityAssessmentAdvice] `
+  [-ShowPassword] `
+  [-GeneratePassword] `
+  [-Plan] `
+  [-InstallSampleDb <string[]>] `
+  [-InstallFirstResponderKit] `
+  [-FirstResponderKitDatabase <string>] `
+  [-InstallMaintenanceSolution] `
+  [-MaintenanceSolutionDatabase <string>] `
+  [-InstallMaintenanceSolutionJobs] `
+  [-MaintenanceSolutionBackupLocation <string>] `
+  [-MaintenanceSolutionCleanupTime <int>] `
+  [-WhatIf]
+```
+
+Parameters:
+
+| Parameter | Default | Notes |
+| --- | --- | --- |
+| `ConfigFile` | `config.yaml` | YAML config to use. |
+| `SecurityAssessmentAdvice` | off | Prints security findings before plan, WhatIf, or deployment. |
+| `ShowPassword` | off | Prints the VM admin password at the end of deployment. Use only for controlled demos. |
+| `GeneratePassword` | off | Allows the toolkit to generate a missing VM admin password in PowerShell and store it in Key Vault. Without this flag, an existing Key Vault secret is reused and a missing secret stops deployment. |
+| `Plan` | off | Prints a config-derived deployment plan and exits. Does not query Azure. |
+| `InstallSampleDb` | none | Downloads and restores selected allowlisted sample databases inside the VM. |
+| `InstallFirstResponderKit` | off | Installs Brent Ozar's First Responder Kit diagnostic stored procedures inside the VM. |
+| `FirstResponderKitDatabase` | `master` | Database where the First Responder Kit procedures are installed. |
+| `InstallMaintenanceSolution` | off | Installs Ola Hallengren's SQL Server Maintenance Solution stored procedures inside the VM. |
+| `MaintenanceSolutionDatabase` | `master` | Database where the Maintenance Solution objects are installed. |
+| `InstallMaintenanceSolutionJobs` | off | Also installs SQL Agent jobs for maintenance tasks. Use only after reviewing schedules and backup storage. |
+| `MaintenanceSolutionBackupLocation` | none | Backup root path for Maintenance Solution SQL Agent jobs. Only used when jobs are installed. |
+| `MaintenanceSolutionCleanupTime` | `0` | Backup retention in hours for Maintenance Solution cleanup jobs. Only used when jobs are installed. |
+| `WhatIf` | off | Uses PowerShell `ShouldProcess` to dry-run mutating operations. |
+
+Allowed `InstallSampleDb` values:
+
+- `AdventureWorks2022`
+- `AdventureWorksLT2022`
+- `AdventureWorksDW2022`
+- `WideWorldImporters`
+- `StackOverflowMini`
+- `ChicagoParkingTickets`
+- `Contoso10K`
+
+Recommended sequence:
+
+```powershell
+New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -GeneratePassword -Plan
+New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -GeneratePassword -WhatIf
+New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -GeneratePassword
+```
+
+Sample database example:
+
+```powershell
+Get-AzureSqlVmToolkitSampleDatabase
+
+New-AzureSqlVmToolkitDeployment `
+  -ConfigFile .\config.local.yaml `
+  -SecurityAssessmentAdvice `
+  -GeneratePassword `
+  -InstallSampleDb AdventureWorks2022, StackOverflowMini
+```
+
+The installer skips a sample database restore when the target database already exists.
+
+Local backup upload is configured in YAML rather than with a command parameter:
+
+```yaml
+localBackups:
+  enabled: true
+  replaceExisting: false
+  sources:
+    - name: "demo"
+      path: "C:\\SqlBackups\\Demo"
+      recurse: true
+```
+
+When enabled, deployment uploads matching backup files to Azure Files and prints the generated `restore-local-backups.ps1` path. Run that script inside the VM without parameters to preview and with `-Execute` to restore.
+
+First Responder Kit example:
+
+```powershell
+New-AzureSqlVmToolkitDeployment `
+  -ConfigFile .\config.local.yaml `
+  -SecurityAssessmentAdvice `
+  -GeneratePassword `
+  -Plan `
+  -InstallFirstResponderKit
+```
+
+Aliases:
+
+- `-InstallBrentOzarScripts`
+- `-InstallBrentOzarFirstResponderKit`
+
+Maintenance Solution example:
+
+```powershell
+New-AzureSqlVmToolkitDeployment `
+  -ConfigFile .\config.local.yaml `
+  -SecurityAssessmentAdvice `
+  -GeneratePassword `
+  -Plan `
+  -InstallMaintenanceSolution
+```
+
+Maintenance Solution jobs are a separate opt-in:
+
+```powershell
+New-AzureSqlVmToolkitDeployment `
+  -ConfigFile .\config.local.yaml `
+  -SecurityAssessmentAdvice `
+  -GeneratePassword `
+  -InstallMaintenanceSolution `
+  -InstallMaintenanceSolutionJobs `
+  -MaintenanceSolutionBackupLocation "Z:\SqlBackups" `
+  -MaintenanceSolutionCleanupTime 168
+```
+
+Aliases:
+
+- `-InstallOlaHallengrenScripts`
+- `-InstallOlaMaintenanceSolution`
+
+## Example Wrapper
+
+The example script forwards to the module:
+
+```powershell
+.\examples\vm_creation_with_bastion.ps1 -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -Plan
+```
+
+Use the module command in automation. Keep the example wrapper for demos or beginner-friendly walkthroughs.

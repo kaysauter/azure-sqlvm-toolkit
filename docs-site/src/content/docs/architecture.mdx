@@ -1,0 +1,98 @@
+---
+title: Architecture
+description: Project layout and module boundaries.
+---
+
+AzSQLVMKit is a PowerShell module with a small public API and focused internal helper files.
+
+## Repository Layout
+
+```text
+AzureSqlVmToolkit.psd1
+AzureSqlVmToolkit.psm1
+Public/
+Private/
+templates/guest/
+examples/
+tests/
+scripts/
+docs-site/
+config.yaml
+Getting-Started.md
+README.md
+LICENSE
+```
+
+## Module Manifest
+
+`AzureSqlVmToolkit.psd1` defines:
+
+- module version `0.1.0`
+- author and MIT license metadata
+- PowerShell version `7.0`
+- public exported functions
+- project and license URLs
+
+## Module Loader
+
+`AzureSqlVmToolkit.psm1`:
+
+1. Stores the module root in `$script:AzureSqlVmToolkitModuleRoot`.
+2. Dot-sources all `.ps1` files under `Private/` and `Public/` in sorted order.
+3. Exports only the public commands listed in the manifest.
+
+## Public Functions
+
+`Public/` contains user-facing commands:
+
+| File | Purpose |
+| --- | --- |
+| `Import-AzureSqlVmToolkitConfig.ps1` | Reads YAML config. |
+| `Resolve-AzureSqlVmToolkitNames.ps1` | Resolves generated names. |
+| `Test-AzureSqlVmToolkitConfig.ps1` | Validates config and resolved names. |
+| `Test-AzureSqlVmToolkitSecurity.ps1` | Runs security assessment and formats results. |
+| `Get-AzureSqlVmToolkitSampleDatabase.ps1` | Lists allowlisted sample databases. |
+| `New-AzureSqlVmToolkitDeployment.ps1` | Main deployment orchestrator. |
+
+## Private Helpers
+
+`Private/` is split by responsibility:
+
+| File | Responsibility |
+| --- | --- |
+| `00-Utilities.ps1` | Config path resolution, value helpers, prerequisite loading, role assignments, PowerShell-side lab password generation, WhatIf placeholder objects. |
+| `10-ConfigAndNaming.ps1` | Config defaults, generated names, slugging, suffix generation, and normalized config object. |
+| `20-Security.ps1` | Address/port checks and Key Vault RBAC requirement guard. |
+| `30-AzureResources.ps1` | Azure resource ensure functions for resource groups, Key Vault, networking, VM, Bastion, storage, secrets, and file share. |
+| `40-GuestSetup.ps1` | VM Run Command guest setup and restore-script publishing. |
+| `50-Plan.ps1` | Plan output and offline WhatIf operation list. |
+| `60-SampleDatabases.ps1` | Sample database catalog, assessment items, and VM install orchestration. |
+| `65-LocalBackups.ps1` | Local backup config validation, Azure Files upload planning, manifest generation, and manual restore-script publishing. |
+| `70-SqlCommunityTools.ps1` | Optional SQL community tool assessment and VM install orchestration. |
+
+## Templates
+
+`templates/guest/` contains scripts run inside the VM or uploaded to Azure Files. This includes guest setup, restore helpers, sample database installation, optional First Responder Kit installation, and optional Maintenance Solution installation. Treat this folder as part of the deployment surface because changes here affect the guest machine.
+
+## Examples
+
+`examples/vm_creation_with_bastion.ps1` is a compatibility wrapper. It imports the module manifest and forwards parameters to `New-AzureSqlVmToolkitDeployment`.
+
+## Tests And Checks
+
+`scripts/Test-Local.ps1` runs non-mutating local checks:
+
+- PowerShell parser checks
+- module manifest validation
+- module import
+- config validation
+- name resolution
+- `-Plan`
+- optional PSScriptAnalyzer
+- optional Pester tests
+
+`tests/AzureSqlVmToolkit.Tests.ps1` covers sample config validation, generated naming, exposure detection, the sample database catalog, and the Key Vault RBAC requirement guard.
+
+## Documentation Site
+
+`docs-site/` is an Astro Starlight static site. The GitHub Pages workflow builds this folder and publishes `docs-site/dist`.

@@ -1,0 +1,76 @@
+---
+title: Local Testing
+description: Test the toolkit while keeping environment-specific values local.
+---
+
+Keep environment-specific Azure values out of git.
+
+The repository ignores:
+
+```text
+config.local.yaml
+*.local.yaml
+*.local.md
+.env
+test-results/
+```
+
+`config.local.yaml` is the simple default for your own Azure values. The `*.local.yaml` wildcard is there so you can keep multiple local configs side by side, for example `demo.local.yaml`, `workshop.local.yaml`, or `switzerland-dev.local.yaml`, without accidentally committing them.
+
+Use `*.local.md` for generated local reports such as cost estimates, `.env` for local-only environment values if you need them, and `test-results/` for generated output. Treat all of these as local working files. YAML configs should contain non-secret settings only; keep passwords, keys, and tokens in Key Vault or another secret store.
+
+## Create A Local Config
+
+```powershell
+Copy-Item .\config.yaml .\config.local.yaml
+```
+
+Edit `config.local.yaml` with your own project name, suffix, and location.
+
+## Run Local Checks
+
+```powershell
+.\scripts\Test-Local.ps1 -ConfigFile .\config.local.yaml
+```
+
+The local test script:
+
+- parses PowerShell files
+- tests the module manifest
+- imports the module
+- validates config
+- resolves generated names
+- runs `-Plan`
+- runs PSScriptAnalyzer if installed
+- runs Pester tests if installed
+
+## Optional Tools
+
+Install Pester:
+
+```powershell
+Install-Module -Name Pester -Scope CurrentUser -Force
+```
+
+Install PSScriptAnalyzer:
+
+```powershell
+Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force
+```
+
+Then rerun:
+
+```powershell
+.\scripts\Test-Local.ps1 -ConfigFile .\config.local.yaml
+```
+
+## Live Testing
+
+Before a real deployment, run:
+
+```powershell
+New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -Plan
+New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -WhatIf
+```
+
+Use a disposable Azure subscription or resource group while the toolkit is beta.

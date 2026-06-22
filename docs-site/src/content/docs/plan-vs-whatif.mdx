@@ -1,0 +1,57 @@
+---
+title: Plan vs WhatIf
+description: When to use -Plan and when to use PowerShell -WhatIf.
+---
+
+AzSQLVMKit supports both `-Plan` and PowerShell `-WhatIf` because they answer different questions.
+
+## `-Plan`
+
+Use `-Plan` first.
+
+```powershell
+New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -Plan
+```
+
+`-Plan`:
+
+- reads and validates the YAML
+- resolves all generated names
+- prints the name source for each name
+- prints the deployment sequence
+- prints the security assessment when requested
+- does not query Azure
+- does not create resources
+
+This is the best mode for beginners and for documentation review.
+
+## `-WhatIf`
+
+Use `-WhatIf` after you have an Azure context.
+
+```powershell
+Connect-AzAccount
+New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -GeneratePassword -WhatIf
+```
+
+`-WhatIf`:
+
+- uses PowerShell `ShouldProcess`
+- names the create/update actions that would run
+- can inspect selected existing resources when you are signed in, including target NIC public IPs and broad RDP/SQL NSG rules
+- does not create resources
+
+If you are not signed in, it falls back to config-derived WhatIf operations.
+
+## Recommended Workflow
+
+```powershell
+.\scripts\Test-Local.ps1 -ConfigFile .\config.local.yaml
+New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -GeneratePassword -Plan
+New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -GeneratePassword -WhatIf
+New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -GeneratePassword
+```
+
+## Existing Resource Behavior
+
+The current toolkit is create-if-missing. It reuses existing resources and performs selected safety checks, including connected checks for target NIC public IPs and broad RDP/SQL NSG rules, but it does not fully reconcile drift on existing VMs, NSGs, Bastion hosts, or storage accounts yet.
