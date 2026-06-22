@@ -33,6 +33,7 @@ In these docs, **AzSQLVMKit** refers to the current tracked toolkit.
 - Missing VM admin password secrets are not generated unless `-GeneratePassword` is supplied.
 - VM passwords are not printed unless `-ShowPassword` is supplied.
 - New Key Vaults use RBAC authorization.
+- Azure-aware `-WhatIf` reports create/reuse/update/drift decisions before mutating actions.
 
 ## First Command
 
@@ -44,6 +45,13 @@ New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessm
 
 This validates config and prints the resolved plan.
 
+After signing in, run an Azure-aware dry run:
+
+```powershell
+Connect-AzAccount
+New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -WhatIf
+```
+
 ## Not Shipped Yet
 
-Full Azure-aware deployment `-WhatIf`, cost helpers, sample database installers, local backup upload, and SQL community-tool installers are tracked as roadmap items.
+Cost helpers, sample database installers, local backup upload, SQL community-tool installers, and live Azure integration evidence are tracked as roadmap items.

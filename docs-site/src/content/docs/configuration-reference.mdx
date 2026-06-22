@@ -85,7 +85,15 @@ Do not put passwords in YAML.
 
 | Field | Notes |
 | --- | --- |
-| `softwareInstalls.installScript` | Trusted PowerShell executed inside the VM through Run Command. |
+| `softwareInstalls.allowDynamicBootstrap` | Allows deployment-time package-manager bootstrap downloads. Use `false` with a prepared VM image or internal source for stronger environments. |
+| `softwareInstalls.chocolatey.bootstrapUrl` | Optional Chocolatey bootstrap source when dynamic bootstrap is allowed. |
+| `softwareInstalls.chocolatey.bootstrapSha256` | Optional SHA-256 digest for the Chocolatey bootstrap script. |
+| `softwareInstalls.packages[].manager` | Package manager. Allowed values are `Chocolatey` and `PowerShellGallery`. |
+| `softwareInstalls.packages[].name` | Package name. |
+| `softwareInstalls.packages[].version` | Required pinned package version. |
+| `softwareInstalls.packages[].sha256` | Optional SHA-256 value for packages where direct checksum verification is available. |
+| `softwareInstalls.packages[].sourceUri` | Optional package source/reference URI for review. |
+| `softwareInstalls.installScript` | Additional trusted PowerShell executed inside the VM after structured package installs. |
 | `softwareInstalls.logonScript` | Optional trusted PowerShell registered for the configured user at logon. |
 
-Review this block carefully. It downloads and runs upstream tooling in the VM.
+Review this block carefully. Dynamic bootstrap and package installation run inside the VM.

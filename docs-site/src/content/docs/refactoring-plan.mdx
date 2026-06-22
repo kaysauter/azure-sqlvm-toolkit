@@ -1,0 +1,62 @@
+---
+title: Refactoring Plan
+description: Planned internal module split and clean GitHub main workflow.
+---
+
+The deployment engine is now testable, but `scripts/AzureSqlVmToolkit.Deployment.psm1` is intentionally due for a mechanical split before more features are added.
+
+## Target Internal Layout
+
+Keep the public command surface unchanged:
+
+- `New-AzureSqlVmToolkitDeployment`
+- `Test-AzureSqlVmToolkitConfig`
+- `vm_creation_with_bastion.ps1` as compatibility wrapper
+
+Split internals by responsibility:
+
+- `scripts/AzureSqlVmToolkit.Deployment.Context.psm1`: config loading, Azure context, predicted resource IDs, shared deployment state.
+- `scripts/AzureSqlVmToolkit.Deployment.Network.psm1`: resource group, VNet, subnet, public IP, NSG, NIC, Bastion.
+- `scripts/AzureSqlVmToolkit.Deployment.Compute.psm1`: VM creation/reuse, managed identity, VM image and size drift.
+- `scripts/AzureSqlVmToolkit.Deployment.Security.psm1`: Key Vault, secrets, role assignments.
+- `scripts/AzureSqlVmToolkit.Deployment.Storage.psm1`: storage account, file share, storage-key secret.
+- `scripts/AzureSqlVmToolkit.Deployment.GuestSetup.psm1`: package script generation, Run Command, Azure Files mount, restore-helper upload.
+- `scripts/AzureSqlVmToolkit.Deployment.Orchestration.psm1`: the high-level deployment order.
+
+`scripts/AzureSqlVmToolkit.Common.psm1` should keep general validation, output, password, naming, and low-level comparison helpers only.
+
+## Refactoring Sequence
+
+1. Move one responsibility at a time without changing behavior.
+2. Keep function names stable during the split.
+3. After each move, run:
+
+```powershell
+.\scripts\Test-Local.ps1 -ConfigFile .\config.yaml
+```
+
+4. Add focused tests only when movement exposes missing coverage.
+5. Update architecture docs after the split lands.
+
+## Acceptance Criteria
+
+- Public command signatures remain unchanged.
+- `-Plan`, `-WhatIf`, and compatibility script behavior remain unchanged.
+- PSScriptAnalyzer and Pester remain clean.
+- No internal module has mixed ownership across network, compute, security, storage, and guest setup.
+- Live Azure tests remain a separate backlog item.
+
+## Clean GitHub Main Head Plan
+
+Use `main` as the only release base:
+
+1. Finish fixes on `codex/azure-aware-release-process`.
+2. Push the branch.
+3. Open a PR into `main`.
+4. Wait for GitHub Actions: `Test toolkit`, docs build, dependency audit, and CodeQL if enabled.
+5. Squash merge into `main` only after checks pass.
+6. Fetch and switch local `main` to `origin/main`.
+7. Do not reset local divergent commits unless they are explicitly reviewed and no longer needed.
+8. Delete merged feature branches after confirming the PR is merged and the docs deployment is healthy.
+
+If local `main` remains divergent, prefer creating future work branches from `origin/main` until that local branch is deliberately cleaned up.

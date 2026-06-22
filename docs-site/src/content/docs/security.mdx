@@ -15,6 +15,7 @@ AzSQLVMKit is lab software. Do not treat it as production-ready.
 - Existing legacy access-policy vaults are rejected.
 - Missing VM admin passwords require `-GeneratePassword`.
 - Password output requires `-ShowPassword`.
+- Azure-aware `-WhatIf` reads existing resources and reports drift before writes.
 
 ## Network
 
@@ -51,13 +52,13 @@ The VM identity uses that permission to retrieve the storage account key secret 
 
 ## Guest Setup
 
-`softwareInstalls.installScript` and `softwareInstalls.logonScript` are trusted code inputs. The sample setup downloads Chocolatey to a temporary file before execution and installs packages for lab convenience.
+`softwareInstalls.packages`, `softwareInstalls.installScript`, and `softwareInstalls.logonScript` are trusted code inputs. The sample pins package versions for Git, PowerShell, Tabular Editor, and dbatools, then runs a small additional install script hook.
 
-For stronger environments, pin versions, mirror installers, and review scripts before deployment.
+For stronger environments, set `allowDynamicBootstrap: false`, use a prepared image or internal package source, add bootstrap checksums where possible, mirror installers, and review scripts before deployment.
 
 ## Remaining Limits
 
-- No full deployment `-WhatIf` yet.
 - No formal penetration-test evidence.
 - No automated guest software vulnerability scan.
-- No full drift correction for existing Azure resources.
+- No live Azure integration test evidence in CI yet.
+- Not every drift state is auto-corrected; unsafe drift is blocked or reported for manual remediation.

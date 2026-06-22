@@ -11,9 +11,16 @@ New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessm
 
 The preview validates config and prints intended resource names without Azure calls.
 
+Use Azure-aware `-WhatIf` after signing in to check real create/reuse/update/drift decisions without mutating resources:
+
+```powershell
+Connect-AzAccount
+New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -WhatIf
+```
+
 ## Deployment Steps
 
-After `Connect-AzAccount`, the module command:
+After `Connect-AzAccount`, the module command runs the same reconciliation order through internal `Ensure-*` functions:
 
 1. Creates or reuses the VM resource group.
 2. Creates or reuses the storage resource group.
@@ -33,4 +40,4 @@ After `Connect-AzAccount`, the module command:
 
 ## Reruns
 
-The toolkit now uses create-or-reuse behavior for the major Azure resources. It does not fully reconcile drift on existing resources.
+The toolkit uses create-or-reuse behavior for the major Azure resources and reports structured step results. Unsafe drift fails early for resources that should not be silently reused, including wrong VNet/subnet prefixes, wrong NIC attachments, legacy Key Vault access-policy mode, VM size drift, and VM image drift. Missing safe items such as role assignments, managed identity, Bastion subnet, and configured NSG rules are handled as updates.

@@ -29,13 +29,20 @@ New-AzureSqlVmToolkitDeployment `
 | `-ShowPassword` | off | Prints the VM admin password. Use only in controlled demos. |
 | `-SecurityAssessmentAdvice` | off | Prints current safety posture and warnings. |
 | `-Plan` | off | Validates config and prints the intended plan without Azure calls. |
-| `-WhatIf` | off | Maps to the safe no-Azure plan path today and emits PowerShell WhatIf messaging. Full Azure-aware WhatIf is still roadmap work. |
+| `-WhatIf` | off | Reads Azure state and reports create/reuse/update/drift decisions without mutating resources. Requires `Connect-AzAccount`. |
 | `-Confirm` | PowerShell preference | Uses PowerShell confirmation support for the public command. |
 
 Preview:
 
 ```powershell
 New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -Plan
+```
+
+Azure-aware dry run:
+
+```powershell
+Connect-AzAccount
+New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -WhatIf
 ```
 
 Deploy with a pre-created password secret:
@@ -68,7 +75,9 @@ The root script remains as a compatibility entry point for existing users.
   [-GeneratePassword] `
   [-ShowPassword] `
   [-SecurityAssessmentAdvice] `
-  [-Plan]
+  [-Plan] `
+  [-WhatIf] `
+  [-Confirm]
 ```
 
 | Parameter | Default | Notes |
@@ -78,6 +87,7 @@ The root script remains as a compatibility entry point for existing users.
 | `-ShowPassword` | off | Prints the VM admin password. Use only in controlled demos. |
 | `-SecurityAssessmentAdvice` | off | Prints current safety posture and warnings. |
 | `-Plan` | off | Validates config and prints the intended plan without Azure calls. |
+| `-WhatIf` | off | Compatibility wrapper for the module command's Azure-aware `-WhatIf`. |
 
 ## `scripts/Test-Local.ps1`
 
@@ -85,7 +95,7 @@ The root script remains as a compatibility entry point for existing users.
 .\scripts\Test-Local.ps1 [-ConfigFile <string>]
 ```
 
-Runs local parser checks, validates the module manifest and config schema, validates the config through `-Plan`, runs Pester 5 tests when installed, and runs PSScriptAnalyzer when installed.
+Runs local parser checks, validates the module manifest, checks version alignment, validates config schema, validates the config through `-Plan`, runs Pester 5 tests when installed, and runs PSScriptAnalyzer when installed.
 
 ## Roadmap Commands
 

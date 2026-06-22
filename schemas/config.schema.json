@@ -282,6 +282,52 @@
       "additionalProperties": false,
       "required": ["installScript"],
       "properties": {
+        "allowDynamicBootstrap": {
+          "type": "boolean",
+          "default": false
+        },
+        "chocolatey": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "bootstrapUrl": {
+              "type": "string",
+              "format": "uri"
+            },
+            "bootstrapSha256": {
+              "$ref": "#/$defs/sha256"
+            }
+          }
+        },
+        "packages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["manager", "name", "version"],
+            "properties": {
+              "manager": {
+                "type": "string",
+                "enum": ["Chocolatey", "PowerShellGallery"]
+              },
+              "name": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._-]{1,128}$"
+              },
+              "version": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9._+-]{1,64}$"
+              },
+              "sha256": {
+                "$ref": "#/$defs/sha256"
+              },
+              "sourceUri": {
+                "type": "string",
+                "format": "uri"
+              }
+            }
+          }
+        },
         "installScript": {
           "type": "string",
           "minLength": 1
@@ -308,6 +354,10 @@
       "minLength": 1,
       "maxLength": 128,
       "pattern": "^[A-Za-z0-9._-]+$"
+    },
+    "sha256": {
+      "type": "string",
+      "pattern": "^[A-Fa-f0-9]{64}$"
     }
   }
 }

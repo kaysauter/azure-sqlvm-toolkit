@@ -1,0 +1,31 @@
+---
+title: Release Process
+description: Versioning, tags, prereleases, and nightly snapshot guidance.
+---
+
+AzureSqlVmToolkit uses SemVer-style versions in `VERSION` and `AzureSqlVmToolkit.psd1`.
+
+## Required Alignment
+
+Before a release, these files must agree:
+
+- `VERSION`
+- `AzureSqlVmToolkit.psd1` `ModuleVersion`
+- `CHANGELOG.md`
+
+`scripts/Test-Version.ps1` enforces the `VERSION` and manifest match. `scripts/Test-Local.ps1` runs that check automatically.
+
+## GitHub Release
+
+Create a matching tag:
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+The `Release toolkit` workflow validates the tag, runs local checks, builds docs, packages the module, and creates the GitHub release.
+
+## Nightly Snapshots
+
+Nightly snapshots are visibility/testing artifacts, not stable releases. Use prerelease versions such as `0.3.0-nightly.20260622`, keep the heavy-development warning visible, and mark GitHub releases as prerelease.

@@ -20,8 +20,10 @@ AzureSqlVmToolkit ships as a PowerShell module plus YAML config for creating an 
 - Uses a system-assigned VM managed identity so the guest can read the storage-key secret.
 - Mounts Azure Files in the VM.
 - Uploads `restore-databases.ps1` for manual `.bak` restores from the mounted share.
-- Provides a module command, no-Azure `-Plan` mode, `-WhatIf` safety mapping, and a local validation script.
-- Keeps validation, naming, password, and guest-script helpers in `scripts/AzureSqlVmToolkit.Common.psm1` so they can be tested without deploying Azure resources.
+- Provides a module command, no-Azure `-Plan` mode, Azure-aware `-WhatIf`, and a local validation script.
+- Keeps validation, naming, password, release, and guest-script helpers in `scripts/` so they can be tested without deploying Azure resources.
+- Uses internal `Ensure-*` functions for Azure create/reuse decisions and early drift handling.
+- Tracks release versions through `VERSION`, `AzureSqlVmToolkit.psd1`, `CHANGELOG.md`, and the `Release toolkit` workflow.
 
 ## Quick Start
 
@@ -58,6 +60,13 @@ Preview the resolved plan without Azure calls:
 New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -Plan
 ```
 
+Preview Azure-aware create/reuse/drift decisions after signing in:
+
+```powershell
+Connect-AzAccount
+New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -WhatIf
+```
+
 Deploy with an existing Key Vault password secret:
 
 ```powershell
@@ -87,6 +96,8 @@ The module and compatibility script read the explicit YAML shape in `config.yaml
 - `storage`
 - `softwareInstalls`
 
+The sample `softwareInstalls` section uses structured package metadata for pinned package versions and keeps `installScript` as an additional custom hook.
+
 The sample config disables the VM public IP and includes no broad inbound RDP or SQL rules:
 
 ```yaml
@@ -106,7 +117,7 @@ If you intentionally enable `network.publicIp.enabled`, keep NSG sources tightly
 - Prefer a pre-created VM admin password secret in Key Vault.
 - Treat `-GeneratePassword` as lab/demo convenience only.
 - Treat `-ShowPassword` as sensitive console output.
-- Review the guest `softwareInstalls.installScript`; it downloads and runs upstream installers inside the VM.
+- Review `softwareInstalls.packages`, `allowDynamicBootstrap`, and `installScript`; guest setup still runs inside the VM with deployment-time trust in the configured package sources.
 - The storage account key is stored in Key Vault and read by the VM managed identity to mount Azure Files.
 
 See [Security.md](Security.md) for details.
@@ -120,6 +131,7 @@ Run:
 ```
 
 The script parses PowerShell files, validates the module manifest and config schema, validates the config through `-Plan`, runs Pester 5 tests when installed, and runs PSScriptAnalyzer when installed.
+It also verifies that `VERSION` matches the module manifest.
 
 For the full local check, install the optional test tooling:
 
@@ -132,12 +144,11 @@ Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force
 
 These items are documented as goals, not shipped behavior in the tracked toolkit yet:
 
-- Full Azure-aware `-WhatIf` reconciliation for every mutating deployment operation.
 - VM size discovery, SQL image discovery, and cost estimate commands.
 - Allowlisted sample database installation.
 - Config-driven local backup upload with manifest generation.
 - Optional First Responder Kit and Ola Hallengren Maintenance Solution installers.
-- More mocked and live integration coverage for Azure resource reconciliation.
+- More live integration coverage for Azure resource reconciliation.
 
 ## Licensing
 

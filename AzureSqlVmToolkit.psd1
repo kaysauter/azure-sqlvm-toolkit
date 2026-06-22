@@ -1,6 +1,6 @@
 @{
     RootModule        = 'AzureSqlVmToolkit.psm1'
-    ModuleVersion     = '0.1.0'
+    ModuleVersion     = '0.2.0'
     GUID              = '6CEB2094-8596-4834-94DB-A2E33F53AD9F'
     Author            = 'Kay Sauter'
     CompanyName       = 'Unknown'
