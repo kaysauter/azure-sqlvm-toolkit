@@ -66,10 +66,20 @@ download: false
 	padding: 1rem;
 }
 
-.flow-image {
+:global(.flow-image) {
 	background: rgba(255, 255, 255, 0.92);
 	border-radius: 8px;
-	padding: 1rem;
+	aspect-ratio: 1180 / 720;
+	margin-inline: auto;
+	width: min(100%, 600px);
+	padding: 8px;
+}
+
+:global(.flow-image img) {
+	display: block;
+	height: 100%;
+	width: 100%;
+	object-fit: contain;
 }
 
 .muted {
@@ -151,7 +161,7 @@ The plan is the conversation starter: it shows generated names, intended resourc
 
 # From local config to working lab
 
-<div class="flow-image mt-8">
+<div class="flow-image mt-4">
 	<img :src="'./toolkit-flow.svg'" alt="AzureSqlVmToolkit deployment flow" />
 </div>
 
