@@ -2,9 +2,9 @@
 
 Automate a SQL Server VM development environment on Azure from a YAML config and a PowerShell module. The toolkit creates or reuses the Azure resources around the VM, keeps Bastion-first access as the default, stores operational secrets in Key Vault, mounts Azure Files inside the guest, and can optionally install sample databases and SQL community tooling.
 
-> **Heavy development warning:** AzureSqlVmToolkit is still evolving quickly and is not ready for production use yet. Use it only for demos, labs, and learning environments. Nightly snapshots may be published for visibility and testing, but they can be incomplete or non-functional and should not be treated as releases. Bug reports, security reports, and feature requests are welcome.
+**Website and documentation:** <https://kaysauter.github.io/azure-sqlvm-toolkit/>
 
-Public documentation: <https://kaysauter.github.io/azure-sqlvm-toolkit/>
+> **Heavy development warning:** AzureSqlVmToolkit is still evolving quickly and is not ready for production use yet. Use it only for demos, labs, and learning environments. Nightly snapshots may be published for visibility and testing, but they can be incomplete or non-functional and should not be treated as releases. Bug reports, security reports, and feature requests are welcome.
 
 ## Current capabilities
 
