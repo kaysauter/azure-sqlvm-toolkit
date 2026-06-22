@@ -1,5 +1,4 @@
 function New-AzureSqlVmToolkitDeployment {
-    [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingWriteHost", "", Justification = "This public command wraps an interactive deployment script.")]
     [CmdletBinding(SupportsShouldProcess = $true, ConfirmImpact = "High")]
     param(
         [Parameter(Mandatory = $false)]
@@ -18,11 +17,6 @@ function New-AzureSqlVmToolkitDeployment {
         [switch]$Plan
     )
 
-    $deploymentScript = Join-Path $script:AzureSqlVmToolkitRoot "vm_creation_with_bastion.ps1"
-    if (-not (Test-Path $deploymentScript)) {
-        throw "Deployment script not found: $deploymentScript"
-    }
-
     $arguments = @{
         ConfigFile = $ConfigFile
     }
@@ -40,20 +34,16 @@ function New-AzureSqlVmToolkitDeployment {
     }
 
     if ($Plan -or $WhatIfPreference) {
-        $arguments.Plan = $true
-        if ($WhatIfPreference) {
-            $arguments.SecurityAssessmentAdvice = $true
-        }
+        $arguments.Plan = $Plan.IsPresent
+    }
 
-        & $deploymentScript @arguments
+    if ($WhatIfPreference) {
+        $arguments.SecurityAssessmentAdvice = $true
+    }
 
-        if ($WhatIfPreference) {
-            $PSCmdlet.ShouldProcess($ConfigFile, "Run Azure SQL VM Toolkit deployment") | Out-Null
-        }
+    if (-not $Plan -and -not $WhatIfPreference -and -not $PSCmdlet.ShouldProcess($ConfigFile, "Run Azure SQL VM Toolkit deployment")) {
         return
     }
 
-    if ($PSCmdlet.ShouldProcess($ConfigFile, "Run Azure SQL VM Toolkit deployment")) {
-        & $deploymentScript @arguments
-    }
+    Invoke-AzureSqlVmToolkitDeployment @arguments -WhatIf:$WhatIfPreference
 }

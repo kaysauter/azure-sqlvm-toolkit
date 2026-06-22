@@ -50,16 +50,27 @@ storage:
   backupPath: '\'
 
 softwareInstalls:
+  allowDynamicBootstrap: true
+  chocolatey:
+    bootstrapUrl: "https://community.chocolatey.org/install.ps1"
+  packages:
+    - manager: "Chocolatey"
+      name: "git.install"
+      version: "2.54.0"
+      sourceUri: "https://community.chocolatey.org/packages/git.install"
+    - manager: "Chocolatey"
+      name: "powershell-core"
+      version: "7.6.3"
+      sourceUri: "https://community.chocolatey.org/packages/powershell-core"
+    - manager: "Chocolatey"
+      name: "tabular-editor"
+      version: "2.28.0"
+      sourceUri: "https://community.chocolatey.org/packages/tabular-editor"
+    - manager: "PowerShellGallery"
+      name: "dbatools"
+      version: "2.7.25"
+      sourceUri: "https://www.powershellgallery.com/packages/dbatools/2.7.25"
   installScript: |
-    Set-ExecutionPolicy Bypass -Scope Process -Force
-    [System.Net.ServicePointManager]::SecurityProtocol = [System.Net.SecurityProtocolType]::Tls12
-    $chocoInstall = Join-Path $env:TEMP 'install-chocolatey.ps1'
-    Invoke-WebRequest -Uri 'https://community.chocolatey.org/install.ps1' -OutFile $chocoInstall -UseBasicParsing
-    & $chocoInstall
-    Remove-Item -Path $chocoInstall -Force
-    $env:Path = [System.Environment]::GetEnvironmentVariable('Path', 'Machine') + ';' + [System.Environment]::GetEnvironmentVariable('Path', 'User')
-    choco install git powershell-core tabular-editor -y
-    Install-PackageProvider -Name NuGet -MinimumVersion 2.8.5.201 -Force
-    Install-Module -Name dbatools -Force
+    Import-Module dbatools
   logonScript: |
     code --install-extension ms-mssql.mssql

@@ -271,6 +271,27 @@ function Test-ToolkitConfig {
     Test-NamePattern -Value (Get-ToolkitConfigValue -Config $Config -Path "storage.driveLetter" -Required) -Name "storage.driveLetter" -Pattern '^[A-Z]$' -MinLength 1 -MaxLength 1
     Test-BackupPath -Value (Get-ToolkitConfigValue -Config $Config -Path "storage.backupPath" -Required)
 
+    $allowDynamicBootstrap = Get-ToolkitConfigValue -Config $Config -Path "softwareInstalls.allowDynamicBootstrap"
+    if ($null -ne $allowDynamicBootstrap) {
+        Test-BooleanConfigValue -Value $allowDynamicBootstrap -Name "softwareInstalls.allowDynamicBootstrap"
+    }
+
+    $bootstrapSha256 = Get-ToolkitConfigValue -Config $Config -Path "softwareInstalls.chocolatey.bootstrapSha256"
+    if ($null -ne $bootstrapSha256 -and [string]$bootstrapSha256 -notmatch '^[A-Fa-f0-9]{64}$') {
+        throw "softwareInstalls.chocolatey.bootstrapSha256 must be a SHA-256 hex digest."
+    }
+
+    foreach ($package in @(Get-ToolkitConfigValue -Config $Config -Path "softwareInstalls.packages")) {
+        if ($null -eq $package) { continue }
+        Test-AllowedValue -Value (Get-ToolkitConfigValue -Config $package -Path "manager" -Required) -Name "softwareInstalls.packages[].manager" -AllowedValues @("Chocolatey", "PowerShellGallery")
+        Test-NamePattern -Value (Get-ToolkitConfigValue -Config $package -Path "name" -Required) -Name "softwareInstalls.packages[].name" -Pattern '^[A-Za-z0-9._-]{1,128}$' -MaxLength 128
+        Test-NamePattern -Value (Get-ToolkitConfigValue -Config $package -Path "version" -Required) -Name "softwareInstalls.packages[].version" -Pattern '^[A-Za-z0-9._+-]{1,64}$' -MaxLength 64
+        $sha256 = Get-ToolkitConfigValue -Config $package -Path "sha256"
+        if ($null -ne $sha256 -and [string]$sha256 -notmatch '^[A-Fa-f0-9]{64}$') {
+            throw "softwareInstalls.packages[].sha256 must be a SHA-256 hex digest."
+        }
+    }
+
     foreach ($field in @("vm.size", "vm.image.publisherName", "vm.image.offer", "vm.image.skus", "vm.image.version")) {
         Test-NamePattern -Value (Get-ToolkitConfigValue -Config $Config -Path $field -Required) -Name $field -Pattern '^[A-Za-z0-9._-]+$' -MaxLength 128
     }
@@ -372,7 +393,7 @@ function ConvertTo-ToolkitDeploymentStepResult {
         [string]$Name,
 
         [Parameter(Mandatory = $true)]
-        [ValidateSet("Created", "Reused", "Updated", "Skipped", "DriftDetected", "Failed")]
+        [ValidateSet("Created", "Reused", "Updated", "Skipped", "DriftDetected", "Failed", "WouldCreate", "WouldUpdate", "WouldRun")]
         [string]$Status,
 
         [Parameter(Mandatory = $false)]
@@ -392,6 +413,108 @@ function ConvertTo-ToolkitDeploymentStepResult {
         Message    = $Message
         ResourceId = $ResourceId
         Detail     = $Detail
+    }
+}
+
+function Write-ToolkitMessage {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingWriteHost", "", Justification = "The toolkit is an interactive deployment command and uses color to distinguish message intent.")]
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("Info", "Step", "Success", "Warning", "Error", "Drift", "Detail", "Plan", "WhatIf")]
+        [string]$Kind,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+
+    $colors = @{
+        Info    = "Cyan"
+        Step    = "Blue"
+        Success = "Green"
+        Warning = "Yellow"
+        Error   = "Red"
+        Drift   = "Magenta"
+        Detail  = "DarkGray"
+        Plan    = "DarkCyan"
+        WhatIf  = "DarkMagenta"
+    }
+
+    $prefixes = @{
+        Info    = "[info]"
+        Step    = "[step]"
+        Success = "[ok]"
+        Warning = "[warn]"
+        Error   = "[error]"
+        Drift   = "[drift]"
+        Detail  = "  -"
+        Plan    = "[plan]"
+        WhatIf  = "[whatif]"
+    }
+
+    Write-Host "$($prefixes[$Kind]) $Message" -ForegroundColor $colors[$Kind]
+}
+
+function Write-ToolkitInfo {
+    param([Parameter(Mandatory = $true)][string]$Message)
+    Write-ToolkitMessage -Kind "Info" -Message $Message
+}
+
+function Write-ToolkitStep {
+    param([Parameter(Mandatory = $true)][string]$Message)
+    Write-ToolkitMessage -Kind "Step" -Message $Message
+}
+
+function Write-ToolkitSuccess {
+    param([Parameter(Mandatory = $true)][string]$Message)
+    Write-ToolkitMessage -Kind "Success" -Message $Message
+}
+
+function Write-ToolkitWarning {
+    param([Parameter(Mandatory = $true)][string]$Message)
+    Write-ToolkitMessage -Kind "Warning" -Message $Message
+}
+
+function Write-ToolkitError {
+    param([Parameter(Mandatory = $true)][string]$Message)
+    Write-ToolkitMessage -Kind "Error" -Message $Message
+}
+
+function Write-ToolkitDrift {
+    param([Parameter(Mandatory = $true)][string]$Message)
+    Write-ToolkitMessage -Kind "Drift" -Message $Message
+}
+
+function Write-ToolkitDetail {
+    param([Parameter(Mandatory = $true)][string]$Message)
+    Write-ToolkitMessage -Kind "Detail" -Message $Message
+}
+
+function Write-ToolkitWhatIf {
+    param([Parameter(Mandatory = $true)][string]$Message)
+    Write-ToolkitMessage -Kind "WhatIf" -Message $Message
+}
+
+function Write-ToolkitDeploymentStepResult {
+    param([Parameter(Mandatory = $true)][object]$Result)
+
+    $message = if ([string]::IsNullOrWhiteSpace($Result.Message)) {
+        "$($Result.Name): $($Result.Status)"
+    }
+    else {
+        "$($Result.Name): $($Result.Message)"
+    }
+
+    switch ($Result.Status) {
+        "Created" { Write-ToolkitSuccess -Message $message }
+        "Reused" { Write-ToolkitInfo -Message $message }
+        "Updated" { Write-ToolkitSuccess -Message $message }
+        "Skipped" { Write-ToolkitDetail -Message $message }
+        "DriftDetected" { Write-ToolkitDrift -Message $message }
+        "Failed" { Write-ToolkitError -Message $message }
+        "WouldCreate" { Write-ToolkitWhatIf -Message $message }
+        "WouldUpdate" { Write-ToolkitWhatIf -Message $message }
+        "WouldRun" { Write-ToolkitWhatIf -Message $message }
+        default { Write-ToolkitInfo -Message $message }
     }
 }
 
@@ -442,6 +565,49 @@ function Compare-ToolkitResourceProperty {
         }
 }
 
+function Assert-ToolkitNoBlockingDrift {
+    param(
+        [Parameter(Mandatory = $true)]
+        [object]$Result
+    )
+
+    if ($Result.Status -eq "DriftDetected" -and $Result.Detail.Policy -eq "Fail") {
+        throw $Result.Message
+    }
+}
+
+function Get-ToolkitGuestSetupWarning {
+    param([object]$Config)
+
+    $warnings = @()
+    $softwareInstalls = Get-ToolkitConfigValue -Config $Config -Path "softwareInstalls"
+    $packages = Get-ToolkitConfigValue -Config $softwareInstalls -Path "packages"
+    $allowDynamicBootstrap = ConvertTo-BooleanDefault -Value (Get-ToolkitConfigValue -Config $softwareInstalls -Path "allowDynamicBootstrap") -Default $false
+
+    if ($allowDynamicBootstrap) {
+        $warnings += "softwareInstalls.allowDynamicBootstrap is true. The guest can download bootstrap tooling at deployment time."
+    }
+
+    if ($packages) {
+        foreach ($package in @($packages)) {
+            $name = Get-ToolkitConfigValue -Config $package -Path "name"
+            $version = Get-ToolkitConfigValue -Config $package -Path "version"
+            $checksum = Get-ToolkitConfigValue -Config $package -Path "sha256"
+            if ([string]::IsNullOrWhiteSpace([string]$version)) {
+                $warnings += "Guest package '$name' does not declare a pinned version."
+            }
+            if ([string]::IsNullOrWhiteSpace([string]$checksum)) {
+                $warnings += "Guest package '$name' does not declare a SHA-256 checksum or source verification value."
+            }
+        }
+    }
+    else {
+        $warnings += "softwareInstalls.packages is not configured. The toolkit will run the legacy installScript and cannot verify every downloaded tool."
+    }
+
+    return $warnings
+}
+
 function Write-ToolkitSecurityAdvice {
     param(
         [object]$Config,
@@ -450,31 +616,35 @@ function Write-ToolkitSecurityAdvice {
         [bool]$ShowPasswordEnabled
     )
 
-    Write-Host "`nSecurity assessment advice:" -ForegroundColor Cyan
+    Write-ToolkitStep -Message "Security assessment advice"
     if ($VmPublicIpEnabled) {
-        Write-Warning "network.publicIp.enabled is true. Prefer Azure Bastion-only access for lab VMs."
+        Write-ToolkitWarning -Message "network.publicIp.enabled is true. Prefer Azure Bastion-only access for lab VMs."
     }
     else {
-        Write-Host "  VM public IP: disabled" -ForegroundColor Green
+        Write-ToolkitSuccess -Message "VM public IP: disabled"
     }
 
     if ($GeneratePasswordEnabled) {
-        Write-Warning "-GeneratePassword creates a lab password in PowerShell. Use an approved secret workflow for production or sensitive environments."
+        Write-ToolkitWarning -Message "-GeneratePassword creates a lab password in PowerShell. Use an approved secret workflow for production or sensitive environments."
     }
     else {
-        Write-Host "  VM password generation: existing Key Vault secret required" -ForegroundColor Green
+        Write-ToolkitSuccess -Message "VM password generation: existing Key Vault secret required"
     }
 
     if ($ShowPasswordEnabled) {
-        Write-Warning "-ShowPassword prints the VM password to the console. Use only in controlled demos."
+        Write-ToolkitWarning -Message "-ShowPassword prints the VM password to the console. Use only in controlled demos."
     }
     else {
-        Write-Host "  VM password output: disabled" -ForegroundColor Green
+        Write-ToolkitSuccess -Message "VM password output: disabled"
+    }
+
+    foreach ($warning in @(Get-ToolkitGuestSetupWarning -Config $Config)) {
+        Write-ToolkitWarning -Message $warning
     }
 
     foreach ($rule in @(Get-ToolkitConfigValue -Config $Config -Path "securityRules")) {
         if ($null -eq $rule) { continue }
-        Write-Host "  NSG rule: $(Get-ToolkitConfigValue -Config $rule -Path 'name') $(Get-ToolkitConfigValue -Config $rule -Path 'direction') $(Get-ToolkitConfigValue -Config $rule -Path 'access') $(Get-ToolkitConfigValue -Config $rule -Path 'destinationPortRange') from $(Get-ToolkitConfigValue -Config $rule -Path 'sourceAddressPrefix')"
+        Write-ToolkitDetail -Message "NSG rule: $(Get-ToolkitConfigValue -Config $rule -Path 'name') $(Get-ToolkitConfigValue -Config $rule -Path 'direction') $(Get-ToolkitConfigValue -Config $rule -Path 'access') $(Get-ToolkitConfigValue -Config $rule -Path 'destinationPortRange') from $(Get-ToolkitConfigValue -Config $rule -Path 'sourceAddressPrefix')"
     }
 }
 
@@ -495,17 +665,17 @@ function Write-ToolkitPlan {
         [string]$FileShareName
     )
 
-    Write-Host "`nDeployment plan:" -ForegroundColor Cyan
-    Write-Host "  Location: $(Get-ToolkitConfigValue -Config $Config -Path 'resourceGroup.location')"
-    Write-Host "  Resource group: $ResourceGroupName"
-    Write-Host "  Storage resource group: $StorageResourceGroupName"
-    Write-Host "  VNet/subnet: $VnetName / $SubnetName"
-    Write-Host "  NSG/NIC/VM: $NsgName / $InterfaceName / $VMName"
-    Write-Host "  VM public IP: $VmPublicIpEnabled"
-    Write-Host "  Bastion: $BastionName"
-    Write-Host "  Key Vault: $KeyVaultName"
-    Write-Host "  Storage account/share: $StorageAccountName / $FileShareName"
-    Write-Host "  Restore helper: restore-databases.ps1 for .bak files on $(Get-ToolkitConfigValue -Config $Config -Path 'storage.driveLetter'):$(Get-ToolkitConfigValue -Config $Config -Path 'storage.backupPath')"
+    Write-ToolkitMessage -Kind "Plan" -Message "Deployment plan"
+    Write-ToolkitDetail -Message "Location: $(Get-ToolkitConfigValue -Config $Config -Path 'resourceGroup.location')"
+    Write-ToolkitDetail -Message "Resource group: $ResourceGroupName"
+    Write-ToolkitDetail -Message "Storage resource group: $StorageResourceGroupName"
+    Write-ToolkitDetail -Message "VNet/subnet: $VnetName / $SubnetName"
+    Write-ToolkitDetail -Message "NSG/NIC/VM: $NsgName / $InterfaceName / $VMName"
+    Write-ToolkitDetail -Message "VM public IP: $VmPublicIpEnabled"
+    Write-ToolkitDetail -Message "Bastion: $BastionName"
+    Write-ToolkitDetail -Message "Key Vault: $KeyVaultName"
+    Write-ToolkitDetail -Message "Storage account/share: $StorageAccountName / $FileShareName"
+    Write-ToolkitDetail -Message "Restore helper: restore-databases.ps1 for .bak files on $(Get-ToolkitConfigValue -Config $Config -Path 'storage.driveLetter'):$(Get-ToolkitConfigValue -Config $Config -Path 'storage.backupPath')"
 }
 
 function Add-ToolkitRoleAssignment {
@@ -662,6 +832,18 @@ Export-ModuleMember -Function @(
     "Get-ToolkitResourceNameSet",
     "ConvertTo-ToolkitDeploymentStepResult",
     "Compare-ToolkitResourceProperty",
+    "Assert-ToolkitNoBlockingDrift",
+    "Write-ToolkitMessage",
+    "Write-ToolkitInfo",
+    "Write-ToolkitStep",
+    "Write-ToolkitSuccess",
+    "Write-ToolkitWarning",
+    "Write-ToolkitError",
+    "Write-ToolkitDrift",
+    "Write-ToolkitDetail",
+    "Write-ToolkitWhatIf",
+    "Write-ToolkitDeploymentStepResult",
+    "Get-ToolkitGuestSetupWarning",
     "Write-ToolkitSecurityAdvice",
     "Write-ToolkitPlan",
     "Add-ToolkitRoleAssignment",

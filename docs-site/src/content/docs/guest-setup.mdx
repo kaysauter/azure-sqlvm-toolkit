@@ -5,19 +5,27 @@ description: Software installation, file-share mount, and restore helper.
 
 Guest setup runs through Azure VM Run Command after the VM exists.
 
-## Install Script
+## Structured Packages
 
-The current sample config:
+The sample config now declares package metadata:
 
-- Sets process execution policy to bypass.
-- Enables TLS 1.2.
-- Downloads Chocolatey's bootstrap script to a temporary file.
-- Executes that temporary file.
-- Installs `git`, `powershell-core`, and `tabular-editor`.
-- Installs NuGet package provider.
-- Installs `dbatools`.
+```yaml
+softwareInstalls:
+  allowDynamicBootstrap: true
+  packages:
+    - manager: "Chocolatey"
+      name: "git.install"
+      version: "2.54.0"
+    - manager: "PowerShellGallery"
+      name: "dbatools"
+      version: "2.7.25"
+```
 
-This is lab convenience. Pin or mirror installers for stronger environments.
+The toolkit generates pinned install commands from this metadata. `allowDynamicBootstrap: true` still permits Chocolatey bootstrap download during deployment, so hardened environments should either preinstall Chocolatey in the VM image or provide a verified internal bootstrap source and package mirror.
+
+## Additional Install Script
+
+`softwareInstalls.installScript` remains available as an additional custom hook after the structured package installs. Keep it small, reviewed, and free of secrets.
 
 ## Logon Script
 

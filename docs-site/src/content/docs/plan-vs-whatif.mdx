@@ -1,9 +1,9 @@
 ---
 title: Plan Vs WhatIf
-description: Current preview support and future dry-run scope.
+description: Offline planning and Azure-aware dry-run behavior.
 ---
 
-## Current `-Plan`
+## `-Plan`
 
 `-Plan` is available today:
 
@@ -13,16 +13,19 @@ New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessm
 
 It does not call Azure. It validates config and prints the intended deployment shape.
 
-## Current `-WhatIf`
+## `-WhatIf`
 
-The public module command supports PowerShell `-WhatIf` and maps it to the safe no-Azure plan path:
+The public module command supports PowerShell `-WhatIf` as an Azure-aware dry run:
 
 ```powershell
+Connect-AzAccount
 New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -WhatIf
 ```
 
-This validates config, prints the local deployment plan, and emits PowerShell WhatIf messaging. It does not perform Azure-aware drift checks yet.
+This validates config, reads Azure state, reports create/reuse/update/drift decisions, and wraps mutating actions in `ShouldProcess`. It does not create, update, or run guest commands while `-WhatIf` is active.
 
-## Roadmap
+## Difference
 
-The remaining work is full Azure-aware `SupportsShouldProcess` coverage across every mutating create/update operation.
+- Use `-Plan` before signing in, while editing YAML, or when you only need resolved resource names.
+- Use `-WhatIf` after signing in, when you need to know what the toolkit would do against the current subscription.
+- Use a real deployment only after `-WhatIf` reports expected drift and update decisions.

@@ -8,15 +8,14 @@ description: Planned work not yet shipped in the tracked toolkit.
 - Keep the module command and compatibility script stable.
 - Expand validation coverage as the config surface grows.
 - Add more mocked and live integration coverage for Azure resource reconciliation.
-- Improve idempotency and drift reporting.
-- Reduce guest setup supply-chain risk with pinned or mirrored artifacts.
+- Add live Azure integration evidence for `-WhatIf` and deployment reruns.
+- Continue reducing guest setup supply-chain risk with mirrored artifacts and checksums.
 
 ## Module Hardening
 
-- Move Azure create/reuse internals behind smaller `Ensure-*` functions.
-- Add full Azure-aware `SupportsShouldProcess`, `-WhatIf`, and `-Confirm` behavior for each mutating operation.
 - Add generated-name overrides.
 - Extend Pester and CI coverage for future public module commands.
+- Add more granular drift repair policies where Azure supports safe updates.
 
 ## Feature Ideas
 

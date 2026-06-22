@@ -22,7 +22,7 @@ Do not commit secrets, generated cost notes, or screenshots that reveal Azure ac
 
 This is the minimum check before publishing module, script, config, or docs changes.
 
-The public module surface lives in `AzureSqlVmToolkit.psd1`, `AzureSqlVmToolkit.psm1`, and `Public/`. The reusable validation, naming, password, role-assignment, reconciliation-result, and guest-script helpers live in `scripts/AzureSqlVmToolkit.Common.psm1`. Focused Pester tests live in `tests/`.
+The public module surface lives in `AzureSqlVmToolkit.psd1`, `AzureSqlVmToolkit.psm1`, and `Public/`. Reusable validation, naming, output, password, role-assignment, reconciliation-result, deployment, and guest-script helpers live in `scripts/`. Focused Pester tests live in `tests/`.
 
 ## Docs
 
@@ -37,7 +37,8 @@ npm run build
 
 - `Deploy docs` builds and publishes the documentation site.
 - `Test toolkit` validates the PowerShell script, common module, tests, sample config, docs dependency audit, and docs build.
+- `Release toolkit` validates version metadata, runs local checks, builds docs, packages the module, and creates a GitHub release from a matching `vX.Y.Z` tag.
 
-## Roadmap Work
+## Release Work
 
-When Azure create/reuse internals move behind smaller `Ensure-*` functions, add mocked Pester coverage and update the command/config docs in the same change set.
+Keep `VERSION`, `AzureSqlVmToolkit.psd1`, and `CHANGELOG.md` aligned. See `RELEASE.md` for the release checklist and nightly snapshot guidance.

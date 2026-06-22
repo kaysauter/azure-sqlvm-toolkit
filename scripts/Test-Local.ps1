@@ -38,11 +38,41 @@ if ($parseFailures.Count -gt 0) {
 Write-Host "Validating module manifest..."
 Test-ModuleManifest -Path (Join-Path $repoRoot "AzureSqlVmToolkit.psd1") | Out-Null
 
+Write-Host "Validating version metadata..."
+& (Join-Path $repoRoot "scripts/Test-Version.ps1") -RepositoryRoot $repoRoot | Out-Null
+
 Write-Host "Validating config schema JSON..."
 Get-Content (Join-Path $repoRoot "schemas/config.schema.json") -Raw | ConvertFrom-Json | Out-Null
 
 Write-Host "Running config validation and plan..."
 & (Join-Path $repoRoot "vm_creation_with_bastion.ps1") -ConfigFile $ConfigFile -SecurityAssessmentAdvice -Plan
+
+$scriptAnalyzer = Get-Module -ListAvailable -Name PSScriptAnalyzer | Select-Object -First 1
+if ($scriptAnalyzer) {
+    Write-Host "Running PSScriptAnalyzer..."
+    $analysis = foreach ($file in $files) {
+        try {
+            Invoke-ScriptAnalyzer -Path $file.FullName -Severity Error,Warning
+        }
+        catch {
+            throw "PSScriptAnalyzer failed for '$($file.FullName)': $($_.Exception.Message)"
+        }
+    }
+    $blocking = $analysis | Where-Object {
+        $_.Severity -eq "Error" -or
+        ($_.Severity -eq "Warning" -and $_.RuleName -ne "PSAvoidUsingWriteHost")
+    }
+
+    if ($blocking) {
+        $blocking | Format-Table -AutoSize
+        throw "PSScriptAnalyzer found blocking issues."
+    }
+
+    Write-Host "PSScriptAnalyzer completed. Write-Host warnings are allowed for this interactive deployment script."
+}
+else {
+    Write-Host "PSScriptAnalyzer is not installed; skipping analyzer checks."
+}
 
 $pester = Get-Module -ListAvailable -Name Pester |
     Where-Object { $_.Version.Major -ge 5 } |
@@ -65,28 +95,6 @@ if ($pester) {
 }
 else {
     Write-Host "Pester 5 is not installed; skipping Pester tests."
-}
-
-$scriptAnalyzer = Get-Module -ListAvailable -Name PSScriptAnalyzer | Select-Object -First 1
-if ($scriptAnalyzer) {
-    Write-Host "Running PSScriptAnalyzer..."
-    $analysis = foreach ($file in $files) {
-        Invoke-ScriptAnalyzer -Path $file.FullName -Severity Error,Warning
-    }
-    $blocking = $analysis | Where-Object {
-        $_.Severity -eq "Error" -or
-        ($_.Severity -eq "Warning" -and $_.RuleName -ne "PSAvoidUsingWriteHost")
-    }
-
-    if ($blocking) {
-        $blocking | Format-Table -AutoSize
-        throw "PSScriptAnalyzer found blocking issues."
-    }
-
-    Write-Host "PSScriptAnalyzer completed. Write-Host warnings are allowed for this interactive deployment script."
-}
-else {
-    Write-Host "PSScriptAnalyzer is not installed; skipping analyzer checks."
 }
 
 Write-Host "Local checks completed successfully."

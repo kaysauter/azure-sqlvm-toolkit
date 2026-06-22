@@ -13,8 +13,11 @@ config.yaml
 schemas/config.schema.json
 Public/
 scripts/AzureSqlVmToolkit.Common.psm1
+scripts/AzureSqlVmToolkit.Deployment.psm1
+scripts/Test-Version.ps1
 scripts/Test-Local.ps1
 tests/AzureSqlVmToolkit.Common.Tests.ps1
+tests/AzureSqlVmToolkit.Deployment.Tests.ps1
 tests/AzureSqlVmToolkit.Module.Tests.ps1
 docs-site/
 README.md
@@ -32,14 +35,15 @@ Licensing.md
 
 The root script remains as a compatibility entry point.
 
-## Deployment Flow
+## Deployment Engine
 
-The deployment flow currently reuses `vm_creation_with_bastion.ps1` internally:
+The module command calls the deployment engine in `scripts/AzureSqlVmToolkit.Deployment.psm1`. The root script is now a compatibility wrapper around the module command.
 
 - Parses YAML with `powershell-yaml`.
 - Uses common helpers for validation, naming, password generation, role assignment, and guest-script generation.
 - Prints a no-Azure `-Plan`.
-- Creates or reuses Azure resources.
+- Runs Azure-aware `-WhatIf` through read-only Azure lookups and `ShouldProcess`.
+- Creates, reuses, updates, or blocks Azure resources through internal `Ensure-*` functions.
 - Configures RBAC-enabled Key Vault access.
 - Creates the SQL Server VM and managed identity.
 - Creates Bastion and storage resources.
@@ -52,8 +56,8 @@ The deployment flow currently reuses `vm_creation_with_bastion.ps1` internally:
 
 ## Checks
 
-`scripts/Test-Local.ps1` runs parser checks, module manifest validation, schema parsing, script-backed config validation, Pester tests when available, and optional PSScriptAnalyzer checks.
+`scripts/Test-Local.ps1` runs parser checks, module manifest validation, version alignment, schema parsing, script-backed config validation, Pester tests when available, and optional PSScriptAnalyzer checks.
 
 ## Roadmap
 
-The next architecture milestone is to move the internal Azure create/reuse logic behind smaller `Ensure-*` functions with structured deployment-step results and full Azure-aware `-WhatIf` behavior.
+The next architecture milestone is live Azure integration evidence for reruns, drift scenarios, and `-WhatIf` output.

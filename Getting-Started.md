@@ -24,6 +24,7 @@ Connect-AzAccount
 ```
 
 The `-Plan` path does not require an Azure context.
+The `-WhatIf` path does require an Azure context because it performs read-only Azure lookups before reporting create/reuse/drift decisions.
 
 Import the module from the repository before running module commands:
 
@@ -96,6 +97,15 @@ New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessm
 
 This validates the YAML and prints the intended resource names, security posture, and restore-helper location.
 
+Run an Azure-aware dry run:
+
+```powershell
+Connect-AzAccount
+New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -WhatIf
+```
+
+This queries Azure, reports whether resources would be created, reused, updated, or blocked by drift, and does not perform the mutating actions.
+
 ## Deploy
 
 With a pre-created password secret:
@@ -127,6 +137,8 @@ Deployment creates or reuses:
 12. Azure Files mount inside the VM.
 13. `restore-databases.ps1` uploaded to the file share.
 
+Existing resources are checked before reuse. Unsafe drift such as wrong VNet/subnet prefixes, wrong NIC attachments, legacy Key Vault access-policy mode, VM size drift, or VM image drift fails early. Safe missing pieces such as NSG rules, managed identity, role assignments, and Bastion subnet are reported as updates.
+
 ## Restore `.bak` Files
 
 The current restore helper is simple. Place `.bak` files on the mounted Azure Files share, sign in to the VM through Bastion, then run:
@@ -145,7 +157,7 @@ Run:
 .\scripts\Test-Local.ps1 -ConfigFile .\config.local.yaml
 ```
 
-The check parses PowerShell files, validates the module manifest and config schema, validates config through `-Plan`, runs Pester 5 tests when installed, and runs PSScriptAnalyzer when installed.
+The check parses PowerShell files, validates the module manifest, checks `VERSION` alignment, validates the config schema, validates config through `-Plan`, runs Pester 5 tests when installed, and runs PSScriptAnalyzer when installed.
 
 For the full local check, install the optional test tooling:
 
@@ -158,7 +170,6 @@ Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force
 
 The current tracked toolkit does not yet include:
 
-- Full Azure-aware deployment `-WhatIf` across every Azure write operation.
 - VM size, SQL image, or cost estimate commands.
 - Built-in sample database restore.
 - Config-driven local backup upload.

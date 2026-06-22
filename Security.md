@@ -14,11 +14,19 @@ The tracked script and sample config now use these safer lab defaults:
 - Existing legacy access-policy Key Vaults are rejected.
 - Missing VM admin passwords are not generated unless `-GeneratePassword` is supplied.
 - VM passwords are not printed unless `-ShowPassword` is supplied.
+- Azure-aware `-WhatIf` reads existing resources and reports create/reuse/update/drift decisions before writes.
 
 Preview the posture without Azure calls:
 
 ```powershell
 New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -Plan
+```
+
+Preview the Azure reconciliation path after signing in:
+
+```powershell
+Connect-AzAccount
+New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -WhatIf
 ```
 
 ## Network Access
@@ -64,12 +72,13 @@ The VM managed identity reads the storage-key secret so the guest can mount Azur
 
 ## Guest Setup
 
-The current config contains PowerShell that runs inside the VM through Azure VM Run Command. The sample downloads Chocolatey's bootstrap script to a temporary file before executing it, then installs packages and dbatools.
+The current config contains structured package metadata plus PowerShell hooks that run inside the VM through Azure VM Run Command. The sample pins versions for Git, PowerShell, Tabular Editor, and dbatools.
 
 This is acceptable for demos and learning environments. For higher-trust environments:
 
 - Pin package versions.
-- Mirror or verify installer content.
+- Set `softwareInstalls.allowDynamicBootstrap: false` and use a prepared image or internal package source.
+- Mirror or verify installer content and add SHA-256 values where possible.
 - Review every command in `softwareInstalls.installScript`.
 - Keep `softwareInstalls.logonScript` minimal and trusted.
 
@@ -94,9 +103,9 @@ The repository ignores those local patterns.
 ## Known Limits
 
 - No production hardening claim.
-- No full drift reconciliation.
-- No full Azure-aware deployment `-WhatIf` reconciliation yet. The module command maps `-WhatIf` to the safe local plan path.
+- No live Azure integration test evidence in CI yet.
+- Not every drift state is auto-corrected; unsafe drift is blocked or reported for manual remediation.
 - No automated vulnerability scan of guest-installed software.
 - No formal penetration test evidence.
 
-Run `.\scripts\Test-Local.ps1` before publishing changes. The check covers parser validation, module manifest validation, schema parsing, no-Azure plan validation, Pester tests when available, and PSScriptAnalyzer when available.
+Run `.\scripts\Test-Local.ps1` before publishing changes. The check covers parser validation, module manifest validation, version alignment, schema parsing, no-Azure plan validation, Pester tests when available, and PSScriptAnalyzer when available.

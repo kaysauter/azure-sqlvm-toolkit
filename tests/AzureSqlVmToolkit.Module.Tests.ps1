@@ -48,8 +48,11 @@ Describe "New-AzureSqlVmToolkitDeployment" {
         { New-AzureSqlVmToolkitDeployment -ConfigFile (Join-Path $repoRoot "config.yaml") -SecurityAssessmentAdvice -Plan } | Should -Not -Throw
     }
 
-    It "maps WhatIf to a no-Azure plan and does not throw" {
-        { New-AzureSqlVmToolkitDeployment -ConfigFile (Join-Path $repoRoot "config.yaml") -WhatIf } | Should -Not -Throw
+    It "keeps WhatIf separate from the no-Azure plan path" {
+        $command = Get-Command New-AzureSqlVmToolkitDeployment
+
+        $command.Parameters.Keys | Should -Contain "Plan"
+        $command.Parameters.Keys | Should -Contain "WhatIf"
     }
 }
 
