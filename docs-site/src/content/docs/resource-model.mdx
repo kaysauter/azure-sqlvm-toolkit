@@ -1,100 +1,41 @@
 ---
 title: Resource Model
-description: Azure resources created or reused by the toolkit.
+description: Azure resources created or reused by the current script.
 ---
 
-This page describes resource behavior with generic examples. Tenant-specific identifiers, subscription details, object IDs, real IP addresses, and local config values should stay in ignored local files or private operational notes.
+## VM Resource Group
 
-## Resource Groups
+Contains:
 
-The toolkit uses two resource group names:
+- VNet and VM subnet.
+- NSG and NIC.
+- Optional VM public IP only when enabled.
+- SQL Server VM.
+- `AzureBastionSubnet`.
+- Bastion public IP.
+- Azure Bastion host.
 
-| Resource group | Purpose |
-| --- | --- |
-| VM resource group | Networking, VM, NIC, NSG, Bastion, and related compute resources. |
-| Storage resource group | Key Vault, storage account, and Azure Files share. |
+## Storage Resource Group
 
-Both are created when missing and reused when present.
+Contains:
 
-## Networking
+- Key Vault.
+- Storage account.
+- Azure Files share.
 
-Networking resources:
+The separate storage group lets you remove the VM lab while keeping storage and secrets when needed.
 
-- VNet
-- VM subnet
-- NSG
-- NIC
-- optional VM public IP
-- Azure Bastion subnet named `AzureBastionSubnet`
-- Bastion public IP
-- Bastion host
+## Names
 
-By default, the VM does not receive a public IP. Bastion has its own public IP because Azure Bastion is the public entry point.
+Names are derived from `resourceGroup.name` in the current script:
 
-The current implementation creates the dedicated Bastion shape with `AzureBastionSubnet`, a Standard static Bastion public IP, and the configured `bastion.sku`. See [Azure Bastion](/azure-sqlvm-toolkit/bastion/) for the SKU guide and YAML examples.
+- `<resourceGroup.name>-vnet`
+- `<resourceGroup.name>-subnet`
+- `<resourceGroup.name>-nsg`
+- `<resourceGroup.name>-nic`
+- `<resourceGroup.name>-vm`
+- `<resourceGroup.name>-bastion`
+- `<resourceGroup.name>-bastion-pip`
+- `<resourceGroup.name>-pip` when VM public IP is enabled
 
-Custom NSG rules are applied only when a new NSG is created. Existing NSG rules are not reconciled yet.
-
-## Virtual Machine
-
-The default VM image is:
-
-| Image field | Default |
-| --- | --- |
-| Publisher | `MicrosoftSQLServer` |
-| Offer | `sql2022-ws2022` |
-| SKU | `sqldev-gen2` |
-| Version | `latest` |
-
-This is a SQL Server Developer image. Review [Licensing](/azure-sqlvm-toolkit/licensing/) and the linked Microsoft terms before deploying it, especially if you change the image or use the environment beyond demos, labs, or development scenarios.
-
-The VM receives a system-assigned managed identity. That identity is used to retrieve the storage-key secret from Key Vault during file-share mounting.
-
-Existing VMs are reused. VM size and image drift are not reconciled yet.
-
-## Key Vault
-
-Key Vault stores:
-
-- VM admin password secret, reused from Key Vault by default
-- storage account key used for Azure Files SMB mounting
-
-Storing the VM admin password in Key Vault keeps it out of YAML and normal console output. Missing passwords are generated in PowerShell only when `-GeneratePassword` is supplied; that path is not a production-grade secret-generation or rotation model. For sensitive environments, create the credential through an approved secret-management workflow and store it directly in Key Vault or another managed secret store.
-
-Key Vault RBAC authorization is required. Legacy access-policy mode is rejected in config and on existing vault reuse.
-
-If the desired Key Vault name is soft-deleted, the toolkit searches for an available numbered variant and reports the new name.
-
-## Role Assignments
-
-With Key Vault RBAC enabled, the toolkit assigns:
-
-| Principal | Role | Scope |
-| --- | --- | --- |
-| Current signed-in principal | `Key Vault Secrets Officer` | Key Vault |
-| VM managed identity | `Key Vault Secrets User` | Storage-key secret scope |
-
-The VM identity receives access to the storage-key secret only, not blanket Key Vault administration.
-
-## Storage
-
-Storage resources:
-
-- storage account
-- Azure Files share
-- storage account key secret in Key Vault
-
-The current implementation uses a storage account key to mount Azure Files inside the VM. This works for beginner labs but is a security tradeoff because storage account keys are powerful.
-
-## Guest Artifacts
-
-The toolkit pushes or runs these artifacts:
-
-| Artifact | Purpose |
-| --- | --- |
-| `install-software.ps1` | Installs baseline tools inside the VM. |
-| `register-logon-task.ps1` | Registers a one-time user logon task when configured. |
-| `mount-fileshare.ps1` | Mounts Azure Files with a key retrieved through managed identity and Key Vault. |
-| `restore-databases.ps1` | Restores `.bak` files with dbatools from the mounted file share. |
-| `restore-local-backups.ps1` | Manually restores config-defined local backup uploads from a timestamped Azure Files folder. |
-| `manifest.json` | Describes uploaded local backup sources, files, and restore behavior for `restore-local-backups.ps1`. |
+Key Vault and storage names come directly from config because they must be globally unique.

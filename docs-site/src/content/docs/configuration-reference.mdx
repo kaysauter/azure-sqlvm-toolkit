@@ -1,222 +1,91 @@
 ---
 title: Configuration Reference
-description: Complete public YAML configuration reference with defaults.
+description: Current YAML fields consumed by the tracked module and compatibility script.
 ---
 
-The recommended config is sparse. Add only values you want to choose or override.
+The module and compatibility script read the explicit YAML shape in `config.yaml` and schema-check required fields before any Azure write operation. The editor-facing JSON schema lives in `schemas/config.schema.json`.
 
-```yaml
-project:
-  name: "sqlvm-demo"
-  environment: "dev"
-  location: "Switzerland North"
-  uniqueSuffix: "demo01"
-```
+## `resourceGroup`
 
-Keep environment-specific, non-secret deployment settings in ignored local YAML files.
-
-The repository ignores both `config.local.yaml` and `*.local.yaml`. Use `config.local.yaml` for your normal local config, and use additional files such as `demo.local.yaml`, `workshop.local.yaml`, or `switzerland-dev.local.yaml` for separate test environments. The repository also ignores `*.local.md`, `.env`, and `test-results/`, so generated local cost reports can stay out of source control.
-
-Do not put secrets in YAML. The toolkit reuses the configured VM admin password secret from Key Vault. It only generates a missing password in PowerShell when `-GeneratePassword` is explicitly supplied, and production-specific secrets should live in Key Vault or another managed secret store.
-
-`-GeneratePassword` is a demo/lab convenience, not a production-grade secret-generation or rotation model. For sensitive environments, use an approved credential workflow and store the resulting password directly in a managed secret store.
-
-## `project`
-
-| Field | Required | Default | Notes |
-| --- | --- | --- | --- |
-| `project.name` | Yes | Legacy `resourceGroup.name`, then `sqlvm-demo` internally | Main name used to derive resources. |
-| `project.environment` | No | `dev` | Added to most derived names. |
-| `project.location` | Yes | Legacy `resourceGroup.location`, then `Switzerland North` internally | Azure region. |
-| `project.uniqueSuffix` | Recommended | Stable six-character hash | Used for globally unique Key Vault and storage names. |
-| `project.tags` | No | `{}` | Applied to created resource groups. |
-
-## `naming`
-
-| Field | Default | Notes |
-| --- | --- | --- |
-| `naming.prefix` | empty | Optional extra prefix before project name. |
-| `naming.overrides.<Name>` | none | Exact resource name override. |
-
-Supported override names:
-
-- `ResourceGroupName`
-- `StorageResourceGroupName`
-- `VnetName`
-- `SubnetName`
-- `PipName`
-- `NsgName`
-- `InterfaceName`
-- `VMName`
-- `ComputerName`
-- `BastionSubnetName`
-- `BastionPipName`
-- `BastionName`
-- `KeyVaultName`
-- `StorageAccountName`
-- `FileShareName`
-
-Example:
-
-```yaml
-naming:
-  overrides:
-    resourceGroupName: "rg-my-lab"
-    keyVaultName: "kv-my-lab-01"
-    storageAccountName: "stmylab01"
-```
-
-## `credentials`
-
-| Field | Default | Notes |
-| --- | --- | --- |
-| `credentials.username` | `azureadmin` | Local VM administrator username. |
-
-The VM admin password is read from Key Vault. It is not stored in YAML. If the secret is missing, the toolkit only generates it in PowerShell when `-GeneratePassword` is supplied.
-
-## `vm`
-
-| Field | Default |
+| Field | Notes |
 | --- | --- |
-| `vm.size` | `Standard_DS13_V2` |
-| `vm.image.publisherName` | `MicrosoftSQLServer` |
-| `vm.image.offer` | `sql2022-ws2022` |
-| `vm.image.skus` | `sqldev-gen2` |
-| `vm.image.version` | `latest` |
-
-The default image is SQL Server 2022 Developer on Windows Server 2022. Before using this or any other SQL Server image, review [Licensing](/azure-sqlvm-toolkit/licensing/) and the linked Microsoft terms for your scenario.
-
-Use the read-only helper commands to discover valid choices before editing YAML:
-
-```powershell
-Get-AzureSqlVmToolkitVmSize -Location "Switzerland North" -IncludeCost
-Get-AzureSqlVmToolkitSqlImage -Location "Switzerland North" -SqlVersion 2022 -Edition Developer
-```
+| `resourceGroup.name` | VM resource group name. Also used as the base for generated resource names. |
+| `resourceGroup.location` | Azure region. |
+| `resourceGroup.tags` | Tags applied to created resource groups. |
 
 ## `network`
 
-| Field | Default | Notes |
-| --- | --- | --- |
-| `network.vnet.addressPrefix` | `192.168.0.0/16` | VNet address space. |
-| `network.subnet.addressPrefix` | `192.168.1.0/24` | VM subnet. |
-| `network.publicIp.enabled` | `false` | Keep false for Bastion-first access. |
-| `network.publicIp.allocationMethod` | `Static` | Used only when VM public IP is enabled. |
-| `network.publicIp.idleTimeoutInMinutes` | `4` | Used only when VM public IP is enabled. |
-| `network.publicIp.sku` | none | Optional Azure public IP SKU. |
+| Field | Notes |
+| --- | --- |
+| `network.vnet.addressPrefix` | VNet IPv4 CIDR. Invalid octets or prefix lengths are rejected. |
+| `network.subnet.addressPrefix` | VM subnet IPv4 CIDR. Invalid octets or prefix lengths are rejected. |
+| `network.publicIp.enabled` | Required boolean. The sample uses `false`; keep disabled for Bastion-first access. |
+| `network.publicIp.allocationMethod` | Required. `Static` or `Dynamic`; used only when VM public IP is enabled. |
+| `network.publicIp.idleTimeoutInMinutes` | Required integer from 4 to 30. Used only when VM public IP is enabled. |
 
 ## `securityRules`
 
-`securityRules` is an optional list of custom NSG rules applied when a new NSG is created.
+Use an empty list by default:
 
 ```yaml
-securityRules:
-  - name: "AllowPrivateRdp"
-    protocol: "Tcp"
-    direction: "Inbound"
-    priority: 1000
-    sourceAddressPrefix: "192.168.0.0/16"
-    sourcePortRange: "*"
-    destinationAddressPrefix: "*"
-    destinationPortRange: 3389
-    access: "Allow"
+securityRules: []
 ```
 
-Avoid internet-sourced RDP or SQL rules such as `sourceAddressPrefix: "*"`, `0.0.0.0/0`, `::/0`, or `Internet` for ports `3389` or `1433`.
+The script rejects broad inbound RDP or SQL rules from `*`, `0.0.0.0/0`, `::/0`, or `Internet`.
+
+When rules are provided, each rule must include `name`, `protocol`, `direction`, `priority`, `sourceAddressPrefix`, `sourcePortRange`, `destinationAddressPrefix`, `destinationPortRange`, and `access`.
 
 ## `keyVault`
 
-| Field | Default | Notes |
-| --- | --- | --- |
-| `keyVault.useRbacAuthorization` | `true` | Required mode. Set to `true` or omit it. |
-| `keyVault.storageKeySecretName` | `storage-account-key` | Secret used by the VM to mount Azure Files. |
-| `keyVault.vmAdminPasswordSecretName` | `vm-admin-password` | Secret containing the VM admin password. Pre-create this secret for sensitive environments. |
-| `keyVault.passwordLength` | `24` | Password length used only when `-GeneratePassword` creates a missing lab password. Minimum supported by code is 4. |
+| Field | Notes |
+| --- | --- |
+| `keyVault.name` | Globally unique Key Vault name. New vaults are RBAC-enabled. |
+| `keyVault.storageKeySecretName` | Secret name for the storage account key. |
+| `keyVault.vmAdminPasswordSecretName` | Secret name for the VM admin password. |
+| `keyVault.passwordLength` | Lab password length when `-GeneratePassword` is used. Must be 12 to 128. |
 
-Legacy Key Vault access-policy mode is not supported. If `useRbacAuthorization` is `false`, validation fails before deployment.
+## `credentials`
+
+| Field | Notes |
+| --- | --- |
+| `credentials.username` | Local VM administrator username. |
+
+Do not put passwords in YAML.
+
+## `vm`
+
+| Field | Notes |
+| --- | --- |
+| `vm.size` | Azure VM size. |
+| `vm.image.publisherName` | Marketplace image publisher. |
+| `vm.image.offer` | Marketplace image offer. |
+| `vm.image.skus` | Marketplace image SKU. |
+| `vm.image.version` | Marketplace image version, usually `latest` for labs. |
 
 ## `bastion`
 
-| Field | Default | Notes |
-| --- | --- | --- |
-| `bastion.subnetAddressPrefix` | `192.168.2.0/24` | Address range for the dedicated `AzureBastionSubnet`. Microsoft requires `/26` or larger for dedicated Bastion deployments. |
-| `bastion.sku` | `Basic` | SKU for newly-created Bastion hosts. Use `Basic`, `Standard`, or `Premium` with the current dedicated toolkit deployment shape. |
-| `bastion.publicIp.allocationMethod` | `Static` | Required for the Bastion public IP in the current dedicated deployment shape. |
-| `bastion.publicIp.idleTimeoutInMinutes` | `4` | Public IP idle timeout. |
-| `bastion.publicIp.sku` | `Standard` | Microsoft requires Standard public IP for dedicated Bastion deployments. |
-
-The Bastion public IP is for the Bastion host, not for the SQL VM. Keep `network.publicIp.enabled` set to `false` unless you intentionally want a public IP on the VM itself.
-
-See [Azure Bastion](/azure-sqlvm-toolkit/bastion/) for SKU explanations, Microsoft documentation links, and YAML examples.
+| Field | Notes |
+| --- | --- |
+| `bastion.subnetAddressPrefix` | IPv4 CIDR for `AzureBastionSubnet`. |
+| `bastion.sku` | Bastion SKU. Allowed values are `Basic`, `Standard`, and `Premium`. The sample uses `Basic`. |
+| `bastion.publicIp.*` | Required public IP settings for the Bastion host, not for the SQL VM. The script expects a `Standard` SKU and `Static` allocation. |
 
 ## `storage`
 
-| Field | Default | Notes |
-| --- | --- | --- |
-| `storage.resourceGroup` | Derived storage resource group | Legacy explicit path still supported. |
-| `storage.accountName` | Derived storage account name | Legacy explicit path still supported. |
-| `storage.skuName` | `Standard_LRS` | Storage account SKU. |
-| `storage.fileShareName` | `sqlbackupshare` | Azure Files share name. |
-| `storage.driveLetter` | `Z` | Mounted drive letter inside the VM. |
-| `storage.backupPath` | `\` | Path searched by restore script under the mounted drive. Use `\` for the share root or a relative folder path; drive letters, UNC paths, `..`, quotes, wildcards, and script metacharacters are rejected. |
-
-## `localBackups`
-
-`localBackups` is optional and disabled by default. It uploads local SQL Server backup files to the Azure Files share, then generates a manual restore script beside the uploaded files.
-
-```yaml
-localBackups:
-  enabled: true
-  uploadRoot: "local-backups"
-  replaceExisting: false
-  sources:
-    - name: "demo"
-      path: "C:\\SqlBackups\\Demo"
-      recurse: true
-      include:
-        - "*.bak"
-        - "*.trn"
-        - "*.dif"
-        - "*.diff"
-```
-
-| Field | Default | Notes |
-| --- | --- | --- |
-| `localBackups.enabled` | `false` | Enables local backup upload. |
-| `localBackups.uploadRoot` | `local-backups` | Azure Files relative root for timestamped upload folders. |
-| `localBackups.replaceExisting` | `false` | Controls whether the generated restore script uses dbatools overwrite behavior when run with `-Execute`. |
-| `localBackups.sources[].name` | none | Required unique source name; used as an Azure Files folder name after sanitizing. |
-| `localBackups.sources[].path` | none | Required local file or directory path. |
-| `localBackups.sources[].recurse` | `false` | Recurses through directory sources. |
-| `localBackups.sources[].include` | `*.bak`, `*.trn`, `*.dif`, `*.diff` | File patterns matched under each source. |
-
-Each deployment uploads to a new folder such as `local-backups/20260528-153045Z-a1b2c3`. The toolkit preflights destinations and refuses to overwrite existing uploaded backup files.
-
-The restore is not automatic. The toolkit uploads `restore-local-backups.ps1`; you run it manually inside the VM first as a preview and then with `-Execute` when ready.
+| Field | Notes |
+| --- | --- |
+| `storage.resourceGroup` | Separate resource group for storage and Key Vault. |
+| `storage.accountName` | Globally unique lowercase storage account name. |
+| `storage.skuName` | Storage SKU. |
+| `storage.fileShareName` | Azure Files share name. |
+| `storage.driveLetter` | Single uppercase drive letter inside the VM. |
+| `storage.backupPath` | Path under the mounted share searched by `restore-databases.ps1`. Drive-qualified paths, UNC paths, traversal, and shell metacharacters are rejected. |
 
 ## `softwareInstalls`
 
-| Field | Default | Notes |
-| --- | --- | --- |
-| `softwareInstalls.installScript` | `templates/guest/install-software.ps1` | Runs through Azure VM Run Command. |
-| `softwareInstalls.logonScript` | `code --install-extension ms-mssql.mssql` | Registered as a one-time logon task when supplied. |
+| Field | Notes |
+| --- | --- |
+| `softwareInstalls.installScript` | Trusted PowerShell executed inside the VM through Run Command. |
+| `softwareInstalls.logonScript` | Optional trusted PowerShell registered for the configured user at logon. |
 
-The default install script downloads the Chocolatey bootstrap script, installs packages, installs the NuGet provider, and installs `dbatools`.
-
-## Legacy Shape
-
-Older explicit config paths still work:
-
-```yaml
-resourceGroup:
-  name: "rg-existing"
-  location: "Switzerland North"
-
-keyVault:
-  name: "kv-existing-01"
-
-storage:
-  resourceGroup: "rg-storage-existing"
-  accountName: "stexisting01"
-```
-
-New documentation and examples prefer the `project:` shape plus optional `naming.overrides`.
+Review this block carefully. It downloads and runs upstream tooling in the VM.

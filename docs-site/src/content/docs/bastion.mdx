@@ -1,113 +1,32 @@
 ---
 title: Azure Bastion
-description: Azure Bastion behavior, SKU choices, and YAML examples for AzSQLVMKit.
+description: Bastion role in the current lab deployment.
 ---
 
-Azure Bastion is the intended way to reach the SQL Server VM. The default toolkit deployment keeps the VM private by setting `network.publicIp.enabled` to `false`, then creates Azure Bastion as the RDP entry point.
+Azure Bastion is the intended RDP path for the SQL VM.
 
-Microsoft describes Azure Bastion as a managed service for RDP/SSH access over TLS without requiring a public IP address on the target VM. Review Microsoft's [Azure Bastion overview](https://learn.microsoft.com/en-us/azure/bastion/bastion-overview), [SKU comparison](https://learn.microsoft.com/en-us/azure/bastion/bastion-sku-comparison), [configuration settings](https://learn.microsoft.com/en-us/azure/bastion/configuration-settings), and [pricing page](https://azure.microsoft.com/en-us/pricing/details/azure-bastion/) before choosing a SKU.
-
-:::note[Microsoft documentation is definitive]
-This page was reviewed against Microsoft documentation in May 2026. Azure Bastion features, pricing, regional availability, and upgrade rules can change. Treat Microsoft Learn and Azure pricing as definitive.
-:::
-
-## Toolkit Behavior
-
-The current toolkit creates the dedicated Azure Bastion deployment shape:
-
-- a subnet named `AzureBastionSubnet`
-- a Bastion public IP with Standard SKU and Static allocation
-- an Azure Bastion host using `bastion.sku`
-
-The default SKU is `Basic`. The target VM still has no public IP by default. The Bastion public IP belongs to the Bastion host, not to the SQL Server VM.
-
-Existing Bastion hosts are reused. The toolkit does not currently reconcile Bastion drift, so changing `bastion.sku` in YAML does not upgrade an already-created Bastion host. Use the Azure portal, Azure CLI, or delete and recreate the Bastion host if you need to change an existing SKU.
-
-The toolkit currently models the SKU and public IP settings only. It does not yet model host scale units, shareable links, native client tunneling, IP Connect, custom ports, session recording, private-only deployment, or availability zones.
-
-## SKU Guide
-
-| SKU | Microsoft Positioning | Practical Meaning | Toolkit Fit |
-| --- | --- | --- | --- |
-| `Developer` | Free dev/test SKU using shared infrastructure. It supports one VM connection at a time, does not use the dedicated `AzureBastionSubnet` shape, and is not suitable for production workloads. | Useful for very small experiments when region support exists and you do not need peering or concurrency. | Not a current toolkit deployment shape. Do not set `bastion.sku: "Developer"` unless toolkit support is added. |
-| `Basic` | Dedicated deployment with fixed capacity. Microsoft documents two instances, with moderate RDP/SSH capacity. | Good default for a small lab where browser-based RDP is enough and advanced Bastion features are not needed. | Default. The toolkit creates the subnet, public IP, and Bastion host for this path. |
-| `Standard` | Basic plus advanced features such as native client, shareable links, IP-based connections, custom ports, file transfer, and configurable scaling. | Choose when you expect more users, want native-client workflows, or need advanced connection features. | Supported as a SKU value for new Bastion hosts. Feature toggles and scaling still need follow-up outside the toolkit today. |
-| `Premium` | Standard plus session recording and private-only deployment options. Microsoft recommends it for compliance and audit needs. | Choose when audit trails, session recording, or a future private-only Bastion design matter. | Supported as a SKU value for new Bastion hosts, but the toolkit does not yet configure session recording or private-only deployment. |
-
-## YAML Examples
-
-### Default Basic Bastion
+The sample config keeps:
 
 ```yaml
 network:
   publicIp:
     enabled: false
+```
 
+Bastion still has its own public IP because that is how the dedicated Bastion shape is reached.
+
+## Current Fields
+
+```yaml
 bastion:
-  sku: "Basic"
   subnetAddressPrefix: "192.168.2.0/24"
+  sku: "Basic"
   publicIp:
     allocationMethod: "Static"
-    sku: "Standard"
     idleTimeoutInMinutes: 4
+    sku: "Standard"
 ```
 
-In practice, the VM stays private, users connect through the Azure portal with Bastion, and the Bastion host has its own Standard static public IP.
+The script creates or reuses `AzureBastionSubnet`, the Bastion public IP, and the Bastion host.
 
-### Standard For Native Client Or Higher Scale
-
-```yaml
-bastion:
-  sku: "Standard"
-  subnetAddressPrefix: "192.168.2.0/24"
-```
-
-In practice, a newly-created Bastion host uses the Standard SKU. This is the right direction when you want features Microsoft gates to Standard or higher, such as native client, shareable links, custom ports, IP Connect, file transfer, or host scaling. Today, the toolkit sets the SKU but does not enable every optional feature for you.
-
-### Premium For Audit-Oriented Environments
-
-```yaml
-bastion:
-  sku: "Premium"
-  subnetAddressPrefix: "192.168.2.0/24"
-```
-
-In practice, a newly-created Bastion host uses the Premium SKU. Premium is the direction to evaluate for session recording or private-only Bastion designs. Today, the toolkit does not configure session recording storage or private-only deployment, so treat those as follow-up Azure configuration tasks.
-
-### Reusing A Named Bastion Host
-
-```yaml
-naming:
-  overrides:
-    BastionName: "bas-my-existing-lab"
-    BastionPipName: "pip-my-existing-lab-bastion"
-
-bastion:
-  sku: "Standard"
-```
-
-In practice, the toolkit looks for the named Bastion host and reuses it when found. If the existing host is `Basic`, the toolkit reports that SKU drift is not reconciled yet; it does not upgrade the host to `Standard`.
-
-## Subnet And Public IP Notes
-
-For dedicated Bastion deployments, Microsoft requires the subnet to be named `AzureBastionSubnet` and recommends a `/26` or larger subnet. The toolkit default is larger than that:
-
-```yaml
-bastion:
-  subnetAddressPrefix: "192.168.2.0/24"
-```
-
-You can use a smaller dedicated range such as `/26` if it does not overlap your VNet address space:
-
-```yaml
-bastion:
-  subnetAddressPrefix: "192.168.2.0/26"
-```
-
-Avoid setting `network.publicIp.enabled: true` just because you use Bastion. That setting creates a public IP on the SQL Server VM itself. Bastion does not require a public IP on the target VM.
-
-## Upgrade And Cost Notes
-
-Azure Bastion is billed independently from the VM. Microsoft documents hourly charges for paid SKUs and outbound data transfer charges; the Developer SKU is free but not production suitable.
-
-Microsoft supports upgrading from lower SKUs to higher SKUs, but not downgrading in place. Downgrades require deleting and recreating the Bastion host. Because AzSQLVMKit does not reconcile existing Bastion SKU drift yet, plan SKU changes deliberately and verify the resulting Azure resource after deployment.
+Advanced Bastion features such as native-client tunneling, shareable links, session recording, private-only Bastion, or host scaling are not modeled yet.

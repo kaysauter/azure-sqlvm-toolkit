@@ -138,7 +138,7 @@ AzSQLVMKit turns a short local YAML file into a transparent deployment flow:
 3. validate security-sensitive choices
 4. create the Azure resources
 5. help the user connect through Bastion
-6. prepare optional samples, tools, and manual restore helpers
+6. mount Azure Files and publish a manual `.bak` restore helper
 
 ---
 
@@ -147,13 +147,13 @@ AzSQLVMKit turns a short local YAML file into a transparent deployment flow:
 # Preview first, deploy second
 
 ```powershell
-New-AzureSqlVmToolkitDeployment `
+.\vm_creation_with_bastion.ps1 `
   -ConfigFile .\config.local.yaml `
   -SecurityAssessmentAdvice `
   -Plan
 ```
 
-The plan is the conversation starter: it shows generated names, intended resources, security advice, optional features, and backup upload intent before Azure resources are created.
+The plan is the conversation starter: it shows generated names, intended resources, security advice, and restore-helper intent before Azure resources are created.
 
 ---
 
@@ -175,9 +175,9 @@ The plan is the conversation starter: it shows generated names, intended resourc
 	<div class="pitch-card"><strong>Compute</strong><br />SQL Server VM with system-assigned managed identity.</div>
 	<div class="pitch-card"><strong>Access</strong><br />Azure Bastion for RDP without a VM public IP.</div>
 	<div class="pitch-card"><strong>Secrets</strong><br />Key Vault for VM password and storage-key handling.</div>
-	<div class="pitch-card"><strong>Storage</strong><br />Azure Files share mounted in the VM for setup artifacts and local backups.</div>
+	<div class="pitch-card"><strong>Storage</strong><br />Azure Files share mounted in the VM for setup artifacts and `.bak` files.</div>
 	<div class="pitch-card"><strong>Guest setup</strong><br />Chocolatey, PowerShell helpers, dbatools, and restore scripts.</div>
-	<div class="pitch-card"><strong>Optional content</strong><br />Sample databases and community SQL maintenance/diagnostic tools.</div>
+	<div class="pitch-card"><strong>Roadmap content</strong><br />Sample databases and community SQL maintenance/diagnostic installers.</div>
 </div>
 
 ---
@@ -191,7 +191,7 @@ The plan is the conversation starter: it shows generated names, intended resourc
 - Key Vault RBAC is the default secret model
 - password generation requires the explicit `-GeneratePassword` flag
 - password output requires the explicit `-ShowPassword` flag
-- local backup restore is manual in v1, avoiding SYSTEM-user auto-restore
+- `.bak` restore is manual, avoiding automatic database overwrite
 
 ---
 
@@ -209,24 +209,24 @@ AzSQLVMKit is currently beta-stage software in heavy development. It is intended
 
 # The toolkit should slow people down before spend
 
-- VM size discovery helps users find available sizes before deploying
-- SQL image discovery makes edition choices visible
-- cost estimates are local reports, not hidden guesswork
+- VM size and SQL image choices are visible in YAML
+- pricing still needs Azure portal, calculator, or PowerShell review
+- future cost estimates should stay local, not hidden guesswork
 - SQL Server licensing remains the user's responsibility
 - Microsoft licensing documentation is definitive
 
 ---
 
-<div class="eyebrow">Local backup restore v1</div>
+<div class="eyebrow">Manual restore helper</div>
 
 # Useful now, conservative by design
 
-The v1 local backup flow uploads selected `.bak`, `.trn`, `.dif`, and `.diff` files to Azure Files, writes a `manifest.json`, and generates `restore-local-backups.ps1`.
+The current script uploads `restore-databases.ps1` to Azure Files. Users place `.bak` files on the mounted share, connect through Bastion, and run the helper manually.
 
-The generated script previews by default and restores only when the user runs:
+The helper restores `.bak` files from the configured share path:
 
 ```powershell
-.\restore-local-backups.ps1 -Execute
+Z:\restore-databases.ps1
 ```
 
 ---

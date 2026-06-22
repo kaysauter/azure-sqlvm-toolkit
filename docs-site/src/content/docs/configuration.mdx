@@ -1,113 +1,45 @@
 ---
 title: Configuration
-description: Understand the sparse YAML model, generated names, and overrides.
+description: How to prepare a local YAML config.
 ---
 
-AzSQLVMKit follows convention over configuration. You provide the project identity, and the toolkit derives the resource names.
+Start from the sample:
 
-## Minimal Config
-
-```yaml
-project:
-  name: "sqlvm-demo"
-  environment: "dev"
-  location: "Switzerland North"
-  uniqueSuffix: "demo01"
+```powershell
+Copy-Item .\config.yaml .\config.local.yaml
 ```
 
-Required:
+Then edit `config.local.yaml`.
 
-- `project.name`
-- `project.location`
+## Required Edits
 
-Recommended:
+Replace placeholder values for:
 
-- `project.environment`
-- `project.uniqueSuffix`
+- `resourceGroup.name`
+- `keyVault.name`
+- `storage.resourceGroup`
+- `storage.accountName`
+- `storage.fileShareName`
+- `credentials.username`
 
-If `project.uniqueSuffix` is omitted, the toolkit derives a stable short suffix from the project name, environment, and location.
+## Safe Network Baseline
 
-## Generated Names
-
-For the sample config, `-Plan` resolves names like:
-
-| Field | Example |
-| --- | --- |
-| `ResourceGroupName` | `rg-sqlvm-demo-dev` |
-| `StorageResourceGroupName` | `rg-sqlvm-demo-dev-storage` |
-| `KeyVaultName` | `kv-sqlvm-demo-dev-demo01` |
-| `StorageAccountName` | `stsqlvmdemodevdemo01` |
-| `VMName` | `vm-sqlvm-demo-dev` |
-| `ComputerName` | `sqlvmdemodev` |
-| `VnetName` | `vnet-sqlvm-demo-dev` |
-| `SubnetName` | `snet-sqlvm-demo-dev` |
-| `NsgName` | `nsg-sqlvm-demo-dev` |
-| `BastionName` | `bas-sqlvm-demo-dev` |
-
-`-Plan` also shows each name source:
-
-- `derived`: created from the project settings
-- `explicit`: read from the legacy config shape
-- `override`: set under `naming.overrides`
-
-## Overrides
-
-Use overrides when you need exact names or want to reuse existing resources:
+Keep the VM private:
 
 ```yaml
-naming:
-  overrides:
-    resourceGroupName: "rg-my-existing-lab"
-    keyVaultName: "kv-my-existing-lab-42"
-    storageAccountName: "stmyexistinglab42"
-```
-
-Storage accounts and Key Vault names are globally unique in Azure, so these are the most common override targets.
-
-## Optional Settings
-
-Only include values that you want to change:
-
-```yaml
-credentials:
-  username: "azureadmin"
-
-vm:
-  size: "Standard_DS13_V2"
-
-storage:
-  skuName: "Standard_LRS"
-  driveLetter: "Z"
-
 network:
   publicIp:
     enabled: false
 
-bastion:
-  sku: "Basic"
-  subnetAddressPrefix: "192.168.2.0/24"
-
-keyVault:
-  useRbacAuthorization: true
+securityRules: []
 ```
 
-For Bastion SKU choices and practical examples, see [Azure Bastion](/azure-sqlvm-toolkit/bastion/).
+Use Azure Bastion for RDP access.
 
-## Legacy Configs
+## Secrets
 
-Existing explicit configs still work:
+Do not put passwords in YAML. Store the VM admin password in Key Vault under `keyVault.vmAdminPasswordSecretName`, or use `-GeneratePassword` only for disposable labs.
 
-```yaml
-resourceGroup:
-  name: "my-rg"
-  location: "Switzerland North"
+## Guest Scripts
 
-keyVault:
-  name: "kv-my-demo-01"
-
-storage:
-  resourceGroup: "my-storage-rg"
-  accountName: "stmydemo01"
-```
-
-New users should prefer the sparse `project:` shape.
+`softwareInstalls.installScript` and `softwareInstalls.logonScript` are trusted PowerShell inputs. Review them before deployment.

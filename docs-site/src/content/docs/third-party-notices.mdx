@@ -1,55 +1,32 @@
 ---
 title: Third-party Notices
-description: Credits, source links, and license reminders for third-party tools, scripts, and sample data AzSQLVMKit builds on.
+description: Credits, source links, and license reminders for tools used or planned by AzSQLVMKit.
 ---
 
-AzSQLVMKit stands on the work of the SQL Server, PowerShell, Azure, and open-source communities.
+This page is a convenience notice, not legal advice. Always review upstream source, license, support, and security posture before using third-party tools or sample data.
 
-This page credits the people, organizations, and projects whose public samples, tools, scripts, package managers, and documentation make the toolkit more useful. AzSQLVMKit is not affiliated with or endorsed by these projects unless a project explicitly says so.
+## Used Today
 
-For a warmer people-first credits page, see [Hall of Fame](/azure-sqlvm-toolkit/hall-of-fame/).
+| Project / Publisher | How The Current Toolkit Uses It | Source Links |
+| --- | --- | --- |
+| Azure PowerShell / Az modules | Creates Azure resources and runs VM commands. | [Az PowerShell docs](https://learn.microsoft.com/powershell/azure/) |
+| PowerShell project and contributors | Runs the toolkit and guest setup scripts. | [PowerShell repo](https://github.com/PowerShell/PowerShell), [PowerShell docs](https://learn.microsoft.com/powershell/) |
+| powershell-yaml | Parses `config.yaml`. | [powershell-yaml](https://github.com/cloudbase/powershell-yaml) |
+| Chocolatey Software and Chocolatey community | Sample guest setup downloads Chocolatey's bootstrap script and installs VM tools. | [Chocolatey docs](https://docs.chocolatey.org/en-us/getting-started/), [Chocolatey packages](https://community.chocolatey.org/packages) |
+| dbatools community | Guest setup installs `dbatools`; `restore-databases.ps1` uses it for `.bak` restores. | [dbatools](https://dbatools.io/), [dbatools GitHub](https://github.com/dataplat/dbatools) |
+| Tabular Editor | Installed by the sample guest setup through Chocolatey. | [Tabular Editor](https://tabulareditor.com/) |
 
-:::danger[License review required]
-This page is a convenience notice, not legal advice and not a substitute for upstream license files, Microsoft terms, or your organization's review process. Always review each upstream source, license, support model, and security posture before enabling optional downloads, sample restores, or script execution.
-:::
+## Roadmap / Manual Use
 
-## Notices
+These projects may appear in roadmap docs or may be installed manually by users after deployment. They are not automated by the tracked script today.
 
-Last reviewed for this documentation: May 2026.
+| Project / Publisher | Notes |
+| --- | --- |
+| Microsoft SQL Server samples | Useful manual `.bak` sources for labs; future allowlisted installer may support them. |
+| Brent Ozar Unlimited First Responder Kit | Useful manual diagnostic toolkit; future installer should remain opt-in. |
+| Ola Hallengren SQL Server Maintenance Solution | Useful manual maintenance toolkit; future installer should keep SQL Agent jobs separately reviewed. |
+| SQLBI Contoso data | Useful BI sample data; review license, size, and redistribution terms. |
+| Daniel Hutmacher SQL Sunday samples | Useful larger sample data; review attribution and redistribution terms. |
+| 7-Zip | May be needed manually for compressed sample data. |
 
-| Project / Publisher | License / Terms Signal | How AzSQLVMKit Uses It | Source Links |
-| --- | --- | --- | --- |
-| Microsoft SQL Server Samples team | MIT license for the `microsoft/sql-server-samples` repository; review Microsoft sample documentation and Microsoft terms for your scenario. | `-InstallSampleDb AdventureWorks2022`, `AdventureWorksLT2022`, and `AdventureWorksDW2022` download `.bak` files from Microsoft-hosted GitHub releases and restore them into the VM. | [AdventureWorks docs](https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure), [sql-server-samples](https://github.com/microsoft/sql-server-samples), [repo license](https://github.com/microsoft/sql-server-samples/blob/master/license.txt), [AdventureWorks release](https://github.com/microsoft/sql-server-samples/releases/tag/adventureworks) |
-| Microsoft SQL Server Samples team | MIT license for the `microsoft/sql-server-samples` repository; review Microsoft sample documentation and Microsoft terms for your scenario. | `-InstallSampleDb WideWorldImporters` downloads the full backup from the Microsoft SQL Server samples release and restores it into the VM. | [WideWorldImporters docs](https://learn.microsoft.com/en-us/sql/samples/wide-world-importers-oltp-install-configure), [WideWorldImporters GitHub docs](https://github.com/microsoft/sql-server-samples/tree/master/samples/databases/wide-world-importers), [repo license](https://github.com/microsoft/sql-server-samples/blob/master/license.txt), [WideWorldImporters release](https://github.com/Microsoft/sql-server-samples/releases/tag/wide-world-importers-v1.0) |
-| Brent Ozar Unlimited and First Responder Kit contributors | MIT license. | `-InstallFirstResponderKit` runs dbatools' installer inside the VM and installs or updates the First Responder Kit in the selected database. | [First Responder Kit repo](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit), [license](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit/blob/dev/LICENSE.md), [Brent Ozar downloads](https://www.brentozar.com/first-aid/), [dbatools installer command](https://dbatools.io/Install-DbaFirstResponderKit/) |
-| Brent Ozar Unlimited, Stack Exchange, and Stack Overflow contributors | Stack Exchange data dump: CC BY-SA 4.0. Attribution and ShareAlike rules apply. | `-InstallSampleDb StackOverflowMini` downloads Brent Ozar Unlimited's packaged mini backup and restores it as `StackOverflowMini`. | [Stack Overflow Database repo](https://github.com/BrentOzarULTD/Stack-Overflow-Database), [Stack Exchange Data Dump](https://archive.org/details/stackexchange), [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/) |
-| Daniel Hutmacher / SQL Sunday | CC BY 4.0 attribution reminder in the toolkit catalog; verify SQL Sunday source terms before redistribution. | `-InstallSampleDb ChicagoParkingTickets` downloads `Chicago.bak` from SQL Sunday and restores it as `Chicago`. This is a large sample and needs substantial VM disk space. | [Daniel Hutmacher](https://sqlsunday.com/about/), [SQL Sunday downloads](https://sqlsunday.com/downloads/), [Chicago backup download](https://public.sqlsunday.com/Chicago.bak), [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/) |
-| SQLBI, including Marco Russo, Alberto Ferrari, and SQLBI contributors | MIT license for the Contoso generator and ready-to-use data repositories. Review SQLBI documentation and release terms before redistribution. | `-InstallSampleDb Contoso10K` downloads SQLBI's compressed SQL Server backup, extracts it in the VM, and restores the Contoso sample. | [Contoso Data Generator](https://www.sqlbi.com/tools/contoso-data-generator/), [generator repo](https://github.com/sql-bi/Contoso-Data-Generator-V2), [generator license](https://github.com/sql-bi/Contoso-Data-Generator-V2/blob/main/LICENSE), [ready-to-use data repo](https://github.com/sql-bi/Contoso-Data-Generator-V2-Data), [ready-to-use data release](https://github.com/sql-bi/Contoso-Data-Generator-V2-Data/releases/tag/ready-to-use-data) |
-| Ola Hallengren and SQL Server Maintenance Solution contributors | MIT license. | `-InstallMaintenanceSolution` runs dbatools' installer inside the VM and installs or updates the Maintenance Solution in the selected database. SQL Agent jobs remain separately opt-in. | [Ola Hallengren](https://ola.hallengren.com/), [Maintenance Solution repo](https://github.com/olahallengren/sql-server-maintenance-solution), [license](https://github.com/olahallengren/sql-server-maintenance-solution/blob/main/LICENSE), [dbatools installer command](https://dbatools.io/Install-DbaMaintenanceSolution/) |
-| dbatools community, created by Chrissy LeMaire and maintained by many SQL Server contributors | MIT license. | Guest setup installs `dbatools`. Restore and optional community-tool installers use `Restore-DbaDatabase`, `Install-DbaFirstResponderKit`, `Install-DbaMaintenanceSolution`, and `Invoke-DbaQuery`. | [dbatools](https://dbatools.io/), [dbatools team](https://dbatools.io/team/), [dbatools GitHub](https://github.com/dataplat/dbatools), [license](https://github.com/dataplat/dbatools/blob/development/LICENSE.md) |
-| Chocolatey Software and Chocolatey community | Chocolatey CLI is Apache-2.0; individual community packages have their own licenses and package metadata. | The default guest setup downloads the Chocolatey bootstrap script to a temporary file and uses `choco install` for VM tools such as Git, PowerShell Core, and Tabular Editor. | [Chocolatey docs](https://docs.chocolatey.org/en-us/getting-started/), [Chocolatey CLI repo](https://github.com/chocolatey/choco), [license](https://github.com/chocolatey/choco/blob/develop/LICENSE), [community package repository](https://community.chocolatey.org/packages) |
-| PowerShell project and contributors | MIT license. | The toolkit itself is a PowerShell module. The default guest setup installs PowerShell Core in the VM for a modern scripting host. | [PowerShell repo](https://github.com/PowerShell/PowerShell), [license](https://github.com/PowerShell/PowerShell/blob/master/LICENSE.txt), [PowerShell docs](https://learn.microsoft.com/powershell/) |
-| Git project and Git for Windows contributors | Git is covered by GPLv2-compatible licenses; Git for Windows is a Windows-focused fork with additional bundled components. Review the package notices for redistribution. | The default guest setup installs Git in the VM because many SQL, BI, and automation workflows expect it to be available. | [Git](https://git-scm.com/), [Git source](https://github.com/git/git), [Git license](https://github.com/git/git/blob/master/COPYING), [Git for Windows](https://gitforwindows.org/), [Git for Windows repo](https://github.com/git-for-windows/git) |
-| 7-Zip / Igor Pavlov | Mostly GNU LGPL; some code has BSD terms and unRAR restrictions. | The sample database installer installs `7zip` through Chocolatey when a selected sample, such as SQLBI Contoso, needs `.7z` extraction. | [7-Zip](https://www.7-zip.org/), [license](https://www.7-zip.org/license.txt), [Chocolatey package](https://community.chocolatey.org/packages/7zip) |
-| Daniel Otykier and Tabular Editor contributors | Tabular Editor 2.x is free and open source; the repository identifies MIT plus bundled third-party license files. Review the repository notices before redistribution. | The default guest setup installs `tabular-editor` through Chocolatey for lab scenarios that involve SQL Server BI or tabular-model tooling. | [Tabular Editor 2.x repo](https://github.com/TabularEditor/TabularEditor), [license](https://github.com/TabularEditor/TabularEditor/blob/master/LICENSE), [Tabular Editor docs](https://docs.tabulareditor.com/) |
-
-## Attribution Rules
-
-AzSQLVMKit does not relicense upstream work. The toolkit only automates installation or restoration from public sources.
-
-Before enabling optional third-party content, check:
-
-- upstream license and attribution requirements
-- whether the source allows redistribution, commercial use, or modification
-- support expectations and release notes
-- storage requirements and Azure runtime cost
-- checksum, signature, or mirroring options for repeatable deployments
-- package-specific notices when a package manager installs software on your behalf
-
-For production-grade or classroom-grade reproducibility, prefer an approved internal artifact mirror with pinned versions and documented checksums.
-
-## Direct Project Contributors
-
-This page is separate from direct project contributor credit.
-
-AzSQLVMKit is MIT licensed. Kay Sauter is the main developer. Direct contributors to this repository will be credited by name unless consent for that is not given.
+Before enabling any optional download or installer in future code, review licensing, storage requirements, data sensitivity, and supply-chain risk.

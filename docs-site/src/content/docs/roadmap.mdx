@@ -1,43 +1,28 @@
 ---
 title: Roadmap
-description: Where AzSQLVMKit is going next.
+description: Planned work not yet shipped in the tracked toolkit.
 ---
-
-AzSQLVMKit is PowerShell-first today. The goal is to grow into a beginner-friendly toolkit that can explain and deploy the same environment through multiple paths.
 
 ## Near Term
 
-- More Pester coverage for config validation and deployment planning
-- Better drift warnings for existing resources
-- Clearer local test and live smoke test commands
-- Stronger supply-chain guidance for guest setup packages
-- Published documentation site with examples and diagrams
+- Keep the module command and compatibility script stable.
+- Expand validation coverage as the config surface grows.
+- Add more mocked and live integration coverage for Azure resource reconciliation.
+- Improve idempotency and drift reporting.
+- Reduce guest setup supply-chain risk with pinned or mirrored artifacts.
 
-## Infrastructure As Code
+## Module Hardening
 
-Future versions may add:
+- Move Azure create/reuse internals behind smaller `Ensure-*` functions.
+- Add full Azure-aware `SupportsShouldProcess`, `-WhatIf`, and `-Confirm` behavior for each mutating operation.
+- Add generated-name overrides.
+- Extend Pester and CI coverage for future public module commands.
 
-- Bicep templates
-- Terraform configuration
-- shared naming and validation logic across deployment paths
-- consistent security assessment output for each deployment engine
+## Feature Ideas
 
-## Security Improvements
-
-Candidate improvements:
-
-- option to pin Chocolatey package versions
-- checksum guidance for downloaded installers
-- storage access alternatives that avoid broad storage account keys
-- richer checks for public network surfaces
-- clearer least-privilege role assignment documentation
-
-## Documentation
-
-The docs site now includes command, configuration, naming, deployment, resource, guest setup, architecture, testing, troubleshooting, and development references. Good next additions are:
-
-- architecture diagrams
-- sanitized screenshots for common workflows
-- worked examples for common scenarios
-- release notes
-- contribution guide
+- VM size and SQL image discovery.
+- Local Markdown cost estimates.
+- Allowlisted sample database restore.
+- Config-driven local backup upload with manifest generation.
+- Optional First Responder Kit installer.
+- Optional Ola Hallengren Maintenance Solution installer.

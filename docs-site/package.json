@@ -7,7 +7,7 @@
     "start": "astro dev",
     "build": "npm run build:astro && npm run build:slides",
     "build:astro": "astro build",
-    "build:slides": "slidev build pitch.md --base /azure-sqlvm-toolkit/pitch/deck/ --out dist/pitch/deck --without-notes --router-mode hash && node scripts/fix-slidev-hash-routes.mjs",
+    "build:slides": "slidev build pitch.md --base /azure-sqlvm-toolkit/pitch/deck/ --out dist/pitch/deck && node scripts/fix-slidev-hash-routes.mjs",
     "preview": "node scripts/preview-docs.mjs",
     "preview:astro": "astro preview",
     "slides": "slidev pitch.md",
@@ -20,11 +20,11 @@
     "sharp": "^0.35.1"
   },
   "devDependencies": {
-    "@slidev/cli": "^52.16.0",
+    "@slidev/cli": "52.9.1",
     "@slidev/theme-default": "^0.25.0"
   },
   "overrides": {
-    "dompurify": "3.4.10",
+    "dompurify": "3.4.11",
     "esbuild": "0.28.1",
     "js-yaml": "4.2.0"
   }

@@ -1,0 +1,75 @@
+name: Test toolkit
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "*.ps1"
+      - "*.psm1"
+      - "*.psd1"
+      - "config.yaml"
+      - "Public/**"
+      - "schemas/**"
+      - "scripts/**"
+      - "tests/**"
+      - "docs-site/**"
+      - ".github/workflows/test-toolkit.yml"
+  pull_request:
+    paths:
+      - "*.ps1"
+      - "*.psm1"
+      - "*.psd1"
+      - "config.yaml"
+      - "Public/**"
+      - "schemas/**"
+      - "scripts/**"
+      - "tests/**"
+      - "docs-site/**"
+      - ".github/workflows/test-toolkit.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  powershell:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PowerShell modules
+        shell: pwsh
+        run: |
+          Install-Module -Name powershell-yaml -Scope CurrentUser -Force
+          Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force
+          Install-Module -Name Pester -Scope CurrentUser -Force -SkipPublisherCheck
+
+      - name: Run local toolkit checks
+        shell: pwsh
+        run: ./scripts/Test-Local.ps1 -ConfigFile config.yaml
+
+  docs:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs-site
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=moderate
+
+      - name: Build documentation
+        run: npm run build

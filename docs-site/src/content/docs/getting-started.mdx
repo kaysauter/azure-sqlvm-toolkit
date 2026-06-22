@@ -1,318 +1,80 @@
 ---
 title: Getting Started
-description: Install prerequisites, preview the deployment, and run AzSQLVMKit safely.
+description: Install prerequisites, prepare config, preview, and deploy.
 ---
 
-:::danger[Heavy development warning]
-AzSQLVMKit is still evolving quickly and is not ready for production use yet. Use it only for demos, labs, and learning environments. Nightly snapshots may be published for visibility and testing, but they can be incomplete or non-functional and should not be treated as releases. Bug reports, security reports, and feature requests are very welcome.
-:::
-
-## Prerequisites
-
-Install PowerShell 7 and the Azure PowerShell module:
+## Install Prerequisites
 
 ```powershell
 Install-Module -Name Az -Scope CurrentUser -Force
 Install-Module -Name powershell-yaml -Scope CurrentUser -Force
 ```
 
-`Az` is Microsoft's Azure PowerShell module. It provides commands like `Connect-AzAccount`, `Get-AzContext`, and the Azure resource cmdlets used by the toolkit. Installing `Az` does not install `AzureSqlVmToolkit`.
+Use PowerShell 7 or newer.
 
-Check the Azure module:
-
-```powershell
-Get-Module -ListAvailable -Name Az
-Get-Module -ListAvailable -Name powershell-yaml
-```
-
-Sign in to Azure:
+Import the module from the repository root:
 
 ```powershell
-Connect-AzAccount
-```
-
-If you have multiple subscriptions, choose the one you want:
-
-```powershell
-Set-AzContext -SubscriptionName "My Subscription"
-```
-
-The module reads YAML configuration with `powershell-yaml`. Install that module explicitly before importing YAML configs; the toolkit does not install modules for you.
-
-## Install AzSQLVMKit
-
-### Option 1: Use The Cloned Repository
-
-This is the recommended development workflow today. Clone or open the repository, then import the module manifest by path:
-
-```powershell
-Set-Location /Users/kaysauter/Developer/azure-sqlvm-toolkit
 Import-Module .\AzureSqlVmToolkit.psd1 -Force
 ```
 
-Check whether it is imported in the current PowerShell session:
-
-```powershell
-Get-Module -Name AzureSqlVmToolkit
-Get-Command -Module AzureSqlVmToolkit
-```
-
-This does not install the toolkit globally. It only loads the module into the current PowerShell session.
-
-### Option 2: Install Locally From The Repository
-
-If you want `AzureSqlVmToolkit` to show up in `Get-Module -ListAvailable`, copy the module files into your current-user PowerShell module path.
-
-```powershell
-$modulePath = ($env:PSModulePath -split [IO.Path]::PathSeparator)[0]
-$target = Join-Path $modulePath "AzureSqlVmToolkit"
-
-New-Item -ItemType Directory -Path $target -Force | Out-Null
-Copy-Item .\AzureSqlVmToolkit.psd1, .\AzureSqlVmToolkit.psm1, .\config.yaml, .\LICENSE -Destination $target -Force
-Copy-Item .\Public, .\Private, .\templates -Destination $target -Recurse -Force
-```
-
-Open a new PowerShell session, then check and import by module name:
-
-```powershell
-Get-Module -ListAvailable -Name AzureSqlVmToolkit
-Import-Module AzureSqlVmToolkit -Force
-Get-Command -Module AzureSqlVmToolkit
-```
-
-When you change files in the repository, repeat the copy step so the installed local copy stays current. For active development, importing `.\AzureSqlVmToolkit.psd1` by path is simpler.
-
-### Option 3: Install From A PowerShell Repository
-
-This will work after the toolkit is published to PowerShell Gallery or another registered PowerShell repository:
-
-```powershell
-Install-Module -Name AzureSqlVmToolkit -Scope CurrentUser
-Import-Module AzureSqlVmToolkit
-```
-
-Until then, use Option 1 or Option 2.
-
-## Check Module Availability
-
-Validate the module manifest:
-
-```powershell
-Test-ModuleManifest -Path .\AzureSqlVmToolkit.psd1
-```
-
-Check whether it is imported in the current PowerShell session:
-
-```powershell
-Get-Module -Name AzureSqlVmToolkit
-Get-Command -Module AzureSqlVmToolkit
-```
-
-To check whether the module is installed somewhere on your PowerShell module path:
-
-```powershell
-Get-Module -ListAvailable -Name AzureSqlVmToolkit
-```
-
-If that returns nothing, the module is not installed globally. You can still use the cloned repository by importing `.\AzureSqlVmToolkit.psd1`.
-
-## Use The Sample Config
-
-The committed `config.yaml` is intentionally small:
-
-```yaml
-project:
-  name: "sqlvm-demo"
-  environment: "dev"
-  location: "Switzerland North"
-  uniqueSuffix: "demo01"
-```
-
-Copy it to an ignored local config for your environment-specific Azure values:
+## Prepare Local Config
 
 ```powershell
 Copy-Item .\config.yaml .\config.local.yaml
 ```
 
-The repo ignores `config.local.yaml` and the wider `*.local.yaml` pattern. Use `config.local.yaml` for your everyday local config, and use names like `demo.local.yaml` or `switzerland-dev.local.yaml` when you want multiple local variants for different subscriptions, regions, or test scenarios.
+Edit `config.local.yaml` and replace placeholder values for resource group, Key Vault, storage account, storage resource group, file share, and VM admin username.
 
-The repo also ignores `*.local.md`, `.env`, and `test-results/` for local-only reports, environment values, and generated test output. Local YAML files are for non-secret deployment settings such as project names, regions, suffixes, and optional resource-name overrides. Keep secrets in Azure Key Vault or another secret store, never in YAML.
+The repository ignores `config.local.yaml` and `*.local.yaml`.
 
-The toolkit does not generate a missing VM admin password unless you explicitly pass `-GeneratePassword`. That flag is useful for disposable demos and labs, but for production or sensitive environments you should pre-create the Key Vault secret through your approved password generation, storage, and rotation process and omit `-GeneratePassword`.
-
-## Choose Size, Image, And Estimate Cost
-
-After signing in with `Connect-AzAccount`, use the helper commands to see what Azure reports for your selected subscription and region.
-
-Find VM sizes:
+Validate the config without Azure calls:
 
 ```powershell
-Get-AzureSqlVmToolkitVmSize `
-  -Location "Switzerland North" `
-  -Category GeneralPurpose `
-  -MinVcpu 4 `
-  -MinMemoryGB 16
+Test-AzureSqlVmToolkitConfig -ConfigFile .\config.local.yaml
 ```
 
-Include subscription-aware VM compute prices:
+## Preview
 
 ```powershell
-Get-AzureSqlVmToolkitVmSize `
-  -Location "Switzerland North" `
-  -Category GeneralPurpose `
-  -MinVcpu 4 `
-  -MinMemoryGB 16 `
-  -IncludeCost
+New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -Plan
 ```
 
-Find SQL Server images:
-
-```powershell
-Get-AzureSqlVmToolkitSqlImage `
-  -Location "Switzerland North" `
-  -SqlVersion 2022 `
-  -Edition Developer
-```
-
-Put your choices in `config.local.yaml`:
-
-```yaml
-vm:
-  size: "Standard_D4s_v5"
-  image:
-    publisherName: "MicrosoftSQLServer"
-    offer: "sql2022-ws2022"
-    skus: "sqldev-gen2"
-    version: "latest"
-```
-
-Export a local cost estimate:
-
-```powershell
-Export-AzureSqlVmToolkitCostEstimate `
-  -ConfigFile .\config.local.yaml `
-  -OutputPath .\cost-estimate.local.md
-```
-
-The report total includes only matched subscription price-sheet items. Usage-based costs such as Azure Files capacity, transactions, backups, snapshots, disk choices, and bandwidth are listed separately. Before using any SQL Server image, review [Licensing](/azure-sqlvm-toolkit/licensing/) and the linked Microsoft terms.
-
-## Choose The Bastion SKU
-
-The default config uses Azure Bastion Basic:
-
-```yaml
-bastion:
-  sku: "Basic"
-```
-
-Use `Standard` when you want to evaluate native-client access, file transfer, shareable links, IP-based connections, custom ports, or host scaling. Use `Premium` when audit-oriented features such as session recording or private-only Bastion designs matter, but note that the toolkit only sets the SKU today; those advanced settings still need Azure follow-up.
-
-See [Azure Bastion](/azure-sqlvm-toolkit/bastion/) for the full SKU guide, Microsoft documentation links, and YAML examples.
-
-## Preview The Deployment Plan
-
-At this point, you should already have installed or imported `AzureSqlVmToolkit` and created `config.local.yaml`.
-
-Run the local checks:
-
-```powershell
-.\scripts\Test-Local.ps1 -ConfigFile .\config.local.yaml
-```
-
-If you opened a new PowerShell session, import the module again:
-
-```powershell
-Import-Module .\AzureSqlVmToolkit.psd1 -Force
-```
-
-Check that the module is imported:
-
-```powershell
-Get-Module -Name AzureSqlVmToolkit
-Get-Command -Module AzureSqlVmToolkit
-```
-
-Run the plan:
-
-```powershell
-New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -GeneratePassword -Plan
-```
-
-Review any password-related security advice carefully. Without `-GeneratePassword`, the toolkit reuses an existing Key Vault secret and stops if the secret is missing. With `-GeneratePassword`, the built-in password is generated in PowerShell and should not be treated as production-grade.
-
-## Dry Run With WhatIf
-
-After signing in to Azure:
-
-```powershell
-New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -GeneratePassword -WhatIf
-```
-
-`-WhatIf` uses PowerShell `ShouldProcess` semantics. If no Azure context is available, the toolkit falls back to config-derived WhatIf operations.
-
-## Optional Sample Databases
-
-List the allowlisted samples:
-
-```powershell
-Get-AzureSqlVmToolkitSampleDatabase
-```
-
-Preview sample database installation in the deployment plan:
-
-```powershell
-New-AzureSqlVmToolkitDeployment `
-  -ConfigFile .\config.local.yaml `
-  -SecurityAssessmentAdvice `
-  -GeneratePassword `
-  -Plan `
-  -InstallSampleDb AdventureWorks2022
-```
-
-Deploy with one or more sample databases:
-
-```powershell
-New-AzureSqlVmToolkitDeployment `
-  -ConfigFile .\config.local.yaml `
-  -SecurityAssessmentAdvice `
-  -GeneratePassword `
-  -InstallSampleDb AdventureWorks2022, StackOverflowMini
-```
-
-The toolkit downloads selected backups inside the VM and skips a restore when the target database already exists. Review source, license, attribution, size, and SQL Server compatibility before enabling any sample.
-
-## Optional Local Backups
-
-Add `localBackups` when you want the toolkit to upload one or more local SQL Server backup folders or files to Azure Files:
-
-```yaml
-localBackups:
-  enabled: true
-  uploadRoot: "local-backups"
-  replaceExisting: false
-  sources:
-    - name: "demo"
-      path: "C:\\SqlBackups\\Demo"
-      recurse: true
-```
-
-The toolkit matches `*.bak`, `*.trn`, `*.dif`, and `*.diff` by default, uploads them into a new timestamped folder, and refuses to overwrite existing uploaded backup files.
-
-Restore is manual by design. After deployment, log into the VM and run the generated path printed by the toolkit:
-
-```powershell
-Z:\local-backups\<timestamp>-<nonce>\restore-local-backups.ps1
-Z:\local-backups\<timestamp>-<nonce>\restore-local-backups.ps1 -Execute
-```
-
-Keep `replaceExisting: false` unless you intentionally want the generated script to use dbatools overwrite behavior.
+`-Plan` does not call Azure. It validates the YAML and prints intended resource names and safety posture.
 
 ## Deploy
 
-Only run the real deployment after reviewing `-Plan` and `-WhatIf`:
+With an existing Key Vault password secret:
+
+```powershell
+Connect-AzAccount
+New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice
+```
+
+For a disposable lab where the password secret does not exist yet:
 
 ```powershell
 New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -GeneratePassword
 ```
 
-The deployment can take 15 to 20 minutes. For sensitive environments, omit `-GeneratePassword` and use a credential created by your approved secret-management workflow.
+Only add `-ShowPassword` when printing the password to the console is acceptable.
+
+## After Deployment
+
+Use Azure Bastion to connect to the VM. The VM has no public IP by default.
+
+To restore `.bak` files, put them on the mounted Azure Files share and run the uploaded helper inside the VM:
+
+```powershell
+Z:\restore-databases.ps1
+```
+
+The helper uses dbatools and `-WithReplace`, so review the files before running it.
+
+## Local Checks
+
+```powershell
+.\scripts\Test-Local.ps1 -ConfigFile .\config.local.yaml
+```
+
+This runs parser checks, module manifest validation, schema parsing, config validation through `-Plan`, Pester tests when installed, and PSScriptAnalyzer when installed.

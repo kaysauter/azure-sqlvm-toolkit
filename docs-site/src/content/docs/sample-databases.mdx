@@ -1,111 +1,18 @@
 ---
 title: Sample Databases
-description: Optional allowlisted sample databases that AzSQLVMKit can download and restore.
+description: Current status of sample database support.
 ---
 
-AzSQLVMKit can optionally install sample databases during deployment.
+Built-in sample database download and restore is not implemented in the tracked script yet.
 
-Use this for labs and demos where you want a SQL Server VM with realistic data already restored. The feature is opt-in and uses a code-defined allowlist; arbitrary download URLs are not accepted.
+Current option:
 
-Please credit the people and organizations who publish these samples. The toolkit makes installation easier, but the sample databases belong to their respective publishers and contributors. See [Third-party Notices](/azure-sqlvm-toolkit/third-party-notices/) for project, creator, source, and license links.
+1. Place `.bak` files on the mounted Azure Files share.
+2. Connect to the VM through Bastion.
+3. Run `Z:\restore-databases.ps1`.
 
-Some samples are large. Downloads are stored on the VM under `C:\SQLSampleDatabases`, extracted archives may temporarily consume additional VM disk space, and restored databases consume SQL Server data/log disk space. Manually uploaded `.bak` files that you place on the mounted Azure Files share also consume Azure Files storage. Plan both VM disk space and file-share capacity before enabling larger samples.
+The helper restores `.bak` files with dbatools and `-WithReplace`.
 
-## List Available Samples
+## Roadmap
 
-```powershell
-Import-Module .\AzureSqlVmToolkit.psd1 -Force
-Get-AzureSqlVmToolkitSampleDatabase
-```
-
-The `Name` column is the value to pass to `-InstallSampleDb`.
-
-## Install A Sample
-
-Preview first:
-
-```powershell
-New-AzureSqlVmToolkitDeployment `
-  -ConfigFile .\config.local.yaml `
-  -SecurityAssessmentAdvice `
-  -GeneratePassword `
-  -Plan `
-  -InstallSampleDb AdventureWorks2022
-```
-
-Then run the Azure-aware dry run:
-
-```powershell
-New-AzureSqlVmToolkitDeployment `
-  -ConfigFile .\config.local.yaml `
-  -SecurityAssessmentAdvice `
-  -GeneratePassword `
-  -WhatIf `
-  -InstallSampleDb AdventureWorks2022
-```
-
-Deploy with the sample database:
-
-```powershell
-New-AzureSqlVmToolkitDeployment `
-  -ConfigFile .\config.local.yaml `
-  -SecurityAssessmentAdvice `
-  -GeneratePassword `
-  -InstallSampleDb AdventureWorks2022
-```
-
-You can pass multiple values:
-
-```powershell
-New-AzureSqlVmToolkitDeployment `
-  -ConfigFile .\config.local.yaml `
-  -SecurityAssessmentAdvice `
-  -GeneratePassword `
-  -InstallSampleDb AdventureWorks2022, StackOverflowMini
-```
-
-## Credits And Current Catalog
-
-| Name | Restores As | Publisher / Credit | Source | Storage Notes |
-| --- | --- | --- | --- | --- |
-| `AdventureWorks2022` | `AdventureWorks2022` | Microsoft SQL Server Samples team | [AdventureWorks docs](https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure) and [GitHub release](https://github.com/microsoft/sql-server-samples/releases/tag/adventureworks) | Small OLTP sample for SQL Server 2022. |
-| `AdventureWorksLT2022` | `AdventureWorksLT2022` | Microsoft SQL Server Samples team | [AdventureWorks docs](https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure) and [GitHub release](https://github.com/microsoft/sql-server-samples/releases/tag/adventureworks) | Small lightweight OLTP sample for SQL Server 2022. |
-| `AdventureWorksDW2022` | `AdventureWorksDW2022` | Microsoft SQL Server Samples team | [AdventureWorks docs](https://learn.microsoft.com/en-us/sql/samples/adventureworks-install-configure) and [GitHub release](https://github.com/microsoft/sql-server-samples/releases/tag/adventureworks) | Small data warehouse sample for SQL Server 2022. |
-| `WideWorldImporters` | `WideWorldImporters` | Microsoft SQL Server Samples team | [WideWorldImporters docs](https://learn.microsoft.com/en-us/sql/samples/wide-world-importers-oltp-install-configure) and [GitHub release](https://github.com/Microsoft/sql-server-samples/releases/tag/wide-world-importers-v1.0) | Medium full Wide World Importers sample. |
-| `StackOverflowMini` | `StackOverflowMini` | Brent Ozar Unlimited, Stack Exchange, and Stack Overflow contributors | [Brent Ozar's Stack Overflow database](https://github.com/BrentOzarULTD/Stack-Overflow-Database/releases/tag/20230114) and [Stack Exchange Data Dump](https://archive.org/details/stackexchange) | Large sample. CC BY-SA attribution rules apply. |
-| `ChicagoParkingTickets` | `Chicago` | Daniel Hutmacher / SQL Sunday | [SQL Sunday downloads](https://sqlsunday.com/downloads/) and [Daniel Hutmacher](https://sqlsunday.com/about/) | Large sample; about 8 GB backup and about 25 GB restored. |
-| `Contoso10K` | `Contoso V2 10K` | SQLBI, including Marco Russo, Alberto Ferrari, and SQLBI contributors | [Contoso Data Generator](https://www.sqlbi.com/tools/contoso-data-generator/) and [ready-to-use data release](https://github.com/sql-bi/Contoso-Data-Generator-V2-Data/releases/tag/ready-to-use-data) | Compressed SQL Server backup; extraction requires additional temporary VM disk space and 7-Zip. |
-
-## Runtime Behavior
-
-The sample database installer runs inside the VM after guest setup and after the restore helper is uploaded.
-
-It:
-
-- downloads selected sample files to `C:\SQLSampleDatabases`
-- extracts `.7z` files when needed
-- imports `dbatools`
-- skips restore when the target database already exists
-- restores missing databases to the local SQL Server instance
-
-The built-in sample installer does not download backups to the Azure Files share. It uses VM-local storage for downloads and extraction. The existing `restore-databases.ps1` helper is different: it restores `.bak` files that you place on the mounted Azure Files share, so those files consume file-share storage.
-
-This is intended to make reruns idempotent for the common case. It does not verify or repair drift inside an existing sample database.
-
-## Security And Licensing
-
-Only allowlisted sample names are accepted. This avoids turning the deployment command into an arbitrary remote-download executor.
-
-Before deploying a sample, review:
-
-- publisher and download source
-- license and attribution requirements
-- checksum or integrity guidance from the publisher
-- SQL Server version compatibility
-- VM disk space
-- Azure Files capacity when you manually store backup files on the mounted share
-- Azure runtime cost while downloading and restoring
-
-Sample data is useful for demos, but it is still third-party content unless it comes from Microsoft. Treat it as external input and do not add production secrets or private data to the sample restore flow.
-
-The current toolkit does not verify sample database file hashes. For production-grade reproducibility, add publisher checksums or an internal artifact mirror before depending on these downloads.
+A future version may add allowlisted sample database sources, skip-if-existing restore behavior, and clearer licensing/attribution prompts.
