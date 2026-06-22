@@ -1,111 +1,17 @@
 ---
-title: Why using AzSQLVMKit
-description: Why this toolkit exists, when it helps, and where the pitch deck fits.
+title: Why Using AzSQLVMKit
+description: Why the current script can help with lab deployments.
 ---
 
-Azure SQL Server VM labs are useful, but the first mile can be surprisingly sharp. A beginner has to choose a VM size, SQL Server image, network shape, secret model, storage path, access method, and naming pattern before they have even connected to the machine.
+Azure SQL VM labs involve many choices: networking, secrets, storage, identity, image, VM size, and guest setup.
 
-AzSQLVMKit exists to make that first mile reviewable and repeatable.
+AzSQLVMKit gives beginners a single reviewed starting point:
 
-:::tip[Pitch deck]
-Open the [AzSQLVMKit front page](/azure-sqlvm-toolkit/) for the public pitch page, or jump straight to the [interactive pitch deck](/azure-sqlvm-toolkit/pitch/deck/) when you want the presentation format.
-:::
+- YAML config instead of portal clicking.
+- A no-Azure `-Plan` preview.
+- Bastion-first access.
+- Key Vault for the VM password and storage key.
+- A manual restore helper for `.bak` files.
+- Local checks and CI for the script/config path.
 
-## The Problem
-
-Manual SQL Server VM demos are easy to get wrong:
-
-- portal-created resources are hard to review before they exist
-- public IPs and broad inbound rules can sneak into lab environments
-- secrets can end up in local files, screenshots, shell history, or ad hoc notes
-- SQL Server image and licensing choices are easy to gloss over
-- cost only becomes visible after resources are already running
-- repeated workshops can drift from one instructor or subscription to the next
-
-The toolkit does not remove the need to understand Azure. It gives you a safer, more visible path for learning and review.
-
-## What The Toolkit Optimizes For
-
-AzSQLVMKit is designed for demos, workshops, labs, and learning environments where users need a working SQL Server VM without hand-building every Azure resource.
-
-It optimizes for:
-
-- a short YAML config instead of a long portal checklist
-- generated names that are visible before deployment
-- `-Plan` output before Azure resources are touched
-- `-WhatIf` support before real deployment
-- Bastion-first access without a VM public IP by default
-- Key Vault RBAC for secret storage and VM access
-- local cost-estimate reports before spending money
-- optional sample databases and SQL community tools for hands-on learning
-
-## Why Not Just Use The Portal?
-
-The Azure portal is excellent for exploration, but it is not a great review artifact. It is easy to click through a setup and lose the exact choices that were made.
-
-With the toolkit, the important choices live in files and command lines:
-
-```powershell
-New-AzureSqlVmToolkitDeployment `
-  -ConfigFile .\config.local.yaml `
-  -SecurityAssessmentAdvice `
-  -Plan
-```
-
-That plan becomes the conversation starter for naming, networking, secret handling, optional data, costs, and known tradeoffs.
-
-## Why Not Full Production IaC First?
-
-Production Infrastructure as Code is still the long-term direction, but it can be too much ceremony for someone learning SQL Server on Azure VMs for the first time.
-
-AzSQLVMKit is PowerShell-first today because it keeps the learning loop short:
-
-- read a small config
-- preview the intended deployment
-- deploy a lab
-- inspect the Azure resources
-- repeat with clearer choices
-
-Future Bicep or Terraform paths can share the same naming, preview, security, and documentation model once the toolkit has matured.
-
-## Security-Minded Defaults
-
-The toolkit starts from safer lab defaults:
-
-- no public IP on the SQL VM by default
-- Azure Bastion is the intended RDP path
-- legacy Key Vault access-policy mode is rejected
-- missing VM admin passwords are not generated unless `-GeneratePassword` is supplied
-- passwords are not printed unless `-ShowPassword` is supplied
-- local backup restore is generated as a manual script instead of running automatically as VM SYSTEM
-
-These defaults are not a production guarantee. They are guardrails for labs and learning.
-
-## When It Is A Good Fit
-
-Use AzSQLVMKit when you want to:
-
-- teach or learn Azure SQL Server VM deployment concepts
-- repeat a workshop environment across subscriptions or regions
-- discuss deployment intent before resources exist
-- compare VM sizes and SQL images before deploying
-- try sample databases or SQL community tooling in a disposable lab
-- keep local environment settings out of public commits
-
-## When It Is Not Enough
-
-Do not treat the current beta as production-ready automation.
-
-Before using this pattern outside disposable labs, you still need a deeper review of:
-
-- approved credential generation and rotation
-- network segmentation and existing Azure drift
-- Azure Policy and Defender for Cloud posture
-- backup, patching, monitoring, and audit requirements
-- SQL Server licensing and image selection
-- package pinning, checksums, and internal mirrors
-- data classification for uploaded backups or sample data
-
-## The One-Sentence Pitch
-
-AzSQLVMKit is a PowerShell-first way to create safer, repeatable Azure SQL Server VM lab environments, with plans, defaults, docs, and warnings designed for people who are still learning the platform.
+It is useful for demos, workshops, and learning environments. It is not enough for production governance, full drift correction, enterprise policy enforcement, or regulated workloads.

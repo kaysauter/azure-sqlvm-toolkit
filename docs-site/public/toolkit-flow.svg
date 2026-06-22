@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc" viewBox="0 0 1180 720">
   <title id="title">AzureSqlVmToolkit deployment flow</title>
-  <desc id="desc">A visual overview showing local configuration flowing into the PowerShell toolkit, safe plan and WhatIf previews, Azure resource deployment, Bastion access, Key Vault secrets, managed identity, and Azure Files mounting.</desc>
+  <desc id="desc">A visual overview showing local configuration flowing into the PowerShell deployment script, safe plan preview, Azure resource deployment, Bastion access, Key Vault secrets, managed identity, and Azure Files mounting.</desc>
   <defs>
     <style>
       :root {
@@ -63,10 +63,10 @@
   <rect class="chip badge-blue" x="78" y="194" width="236" height="48" rx="12" />
   <text class="text mono" x="96" y="225">config.local.yaml</text>
   <rect class="chip badge-violet" x="78" y="260" width="236" height="48" rx="12" />
-  <text class="text mono" x="96" y="291">Import-Module</text>
+  <text class="text mono" x="96" y="291">script + checks</text>
 
   <rect class="panel" x="440" y="118" width="300" height="235" rx="18" />
-  <text class="text section" x="468" y="156">Toolkit module</text>
+  <text class="text section" x="468" y="156">Deployment script</text>
   <text class="text muted small" x="468" y="190">Resolve names</text>
   <text class="text muted small" x="468" y="220">Validate config</text>
   <text class="text muted small" x="468" y="250">Assess security</text>
@@ -74,7 +74,7 @@
   <rect class="chip badge-green" x="468" y="303" width="112" height="34" rx="10" />
   <text class="text small" x="492" y="326">-Plan</text>
   <rect class="chip badge-amber" x="594" y="303" width="112" height="34" rx="10" />
-  <text class="text small" x="614" y="326">-WhatIf</text>
+  <text class="text small" x="604" y="326">local checks</text>
 
   <rect class="panel-soft" x="830" y="120" width="300" height="230" rx="18" />
   <text class="text section" x="858" y="158">Azure resources</text>
@@ -94,19 +94,19 @@
   <text class="text section" x="433" y="468">Key Vault</text>
   <text class="text muted small" x="433" y="503">VM password</text>
   <text class="text muted small" x="433" y="533">Storage key secret</text>
-  <text class="text muted small" x="433" y="563">RBAC by default</text>
+  <text class="text muted small" x="433" y="563">RBAC enabled</text>
 
   <rect class="panel" x="715" y="430" width="190" height="165" rx="18" />
   <text class="text section" x="743" y="468">Azure Files</text>
   <text class="text muted small" x="743" y="503">Mounted in VM</text>
-  <text class="text muted small" x="743" y="533">Backups share</text>
+  <text class="text muted small" x="743" y="533">.bak files</text>
   <text class="text muted small" x="743" y="563">Restore script</text>
 
   <rect class="panel" x="960" y="430" width="170" height="165" rx="18" />
   <text class="text section" x="988" y="468">Guest setup</text>
   <text class="text muted small" x="988" y="503">Install tools</text>
   <text class="text muted small" x="988" y="533">Mount share</text>
-  <text class="text muted small" x="988" y="563">Run restore</text>
+  <text class="text muted small" x="988" y="563">Manual restore</text>
 
   <path class="line" d="M350 235 H430" />
   <path class="line" d="M740 235 H820" />

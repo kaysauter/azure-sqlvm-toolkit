@@ -17,6 +17,14 @@ const patchedRouteHelperPattern = new RegExp(
 		'([A-Za-z_$][\\w$]*)\\?`presenter/\\$\\{\\2\\}`:`\\$\\{\\2\\}`\\}`',
 	'g',
 );
+const historyBasePattern = new RegExp(
+	`history:([A-Za-z_$][\\w$]*)\\("${deckBase.replaceAll('/', '\\/')}"\\)`,
+	'g',
+);
+const patchedHistoryBasePattern = new RegExp(
+	`history:([A-Za-z_$][\\w$]*)\\("${deckBase.replaceAll('/', '\\/')}#"\\)`,
+	'g',
+);
 
 const findJavaScriptFiles = (directory) => {
 	const entries = readdirSync(directory, { withFileTypes: true });
@@ -48,9 +56,14 @@ let alreadyPatched = 0;
 for (const file of findJavaScriptFiles(assetsRoot)) {
 	const source = readFileSync(file, 'utf8');
 	alreadyPatched += source.match(patchedRouteHelperPattern)?.length || 0;
-	const patched = source.replace(routeHelperPattern, (_match, exportFlag, routeValue, presenterFlag) => {
+	alreadyPatched += source.match(patchedHistoryBasePattern)?.length || 0;
+	let patched = source.replace(routeHelperPattern, (_match, exportFlag, routeValue, presenterFlag) => {
 		replacements += 1;
 		return `return\`/\${${exportFlag}?\`export/\${${routeValue}}\`:${presenterFlag}?\`presenter/\${${routeValue}}\`:\`\${${routeValue}}\`}\``;
+	});
+	patched = patched.replace(historyBasePattern, (_match, historyHelper) => {
+		replacements += 1;
+		return `history:${historyHelper}("${deckBase}#")`;
 	});
 
 	if (patched !== source) {
@@ -59,12 +72,12 @@ for (const file of findJavaScriptFiles(assetsRoot)) {
 }
 
 if (replacements === 1) {
-	console.log('Patched Slidev hash route helper to use local hash paths.');
+	console.log('Patched Slidev routing to use hash-safe GitHub Pages paths.');
 	process.exit(0);
 }
 
 if (replacements === 0 && alreadyPatched === 1) {
-	console.log('Slidev hash route helper already uses local hash paths.');
+	console.log('Slidev routing already uses hash-safe GitHub Pages paths.');
 	process.exit(0);
 }
 

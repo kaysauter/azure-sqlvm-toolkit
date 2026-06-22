@@ -1,111 +1,43 @@
 ---
 title: Development
-description: How to work on the module and docs safely.
+description: Contributor notes for the current module-based toolkit.
 ---
 
-## Local Files And Secrets
+## Local Files
 
-Keep these local-only files out of commits:
+Use ignored local files for environment-specific settings:
 
 - `config.local.yaml`
 - `*.local.yaml`
 - `*.local.md`
 - `.env`
-- test output containing subscription, tenant, object, IP, or secret values
-- screenshots that reveal Azure account or resource identifiers
 
-Use placeholder names in docs and examples. YAML examples should contain non-secret deployment settings only. Secrets belong in Key Vault or another managed secret store, not in repository files.
+Do not commit secrets, generated cost notes, or screenshots that reveal Azure account details.
 
-The `*.local.yaml` wildcard is intentional. It lets contributors keep multiple private deployment configs, such as `demo.local.yaml` or `region-test.local.yaml`, while keeping the public repository clean.
-
-The `*.local.md` wildcard is for generated local reports such as cost estimates. Those reports can include subscription-specific pricing and resource choices, so keep them out of public commits.
-
-## Local Module Checks
-
-```powershell
-.\scripts\Test-Local.ps1
-```
-
-With a local config:
+## Checks
 
 ```powershell
 .\scripts\Test-Local.ps1 -ConfigFile .\config.local.yaml
 ```
 
-The script is non-mutating. It parses files, validates the manifest, imports the module, validates config, resolves names, runs `-Plan`, and optionally runs PSScriptAnalyzer and Pester.
+This is the minimum check before publishing module, script, config, or docs changes.
 
-## Optional Quality Tools
+The public module surface lives in `AzureSqlVmToolkit.psd1`, `AzureSqlVmToolkit.psm1`, and `Public/`. The reusable validation, naming, password, role-assignment, reconciliation-result, and guest-script helpers live in `scripts/AzureSqlVmToolkit.Common.psm1`. Focused Pester tests live in `tests/`.
 
-```powershell
-Install-Module -Name Pester -Scope CurrentUser -Force
-Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force
-```
+## Docs
 
-## Docs Site
+The published docs live under `docs-site/`.
 
-Preview:
-
-```powershell
-Set-Location .\docs-site
-npm run dev
-```
-
-Build:
-
-```powershell
-Set-Location .\docs-site
+```bash
+cd docs-site
 npm run build
 ```
 
-The docs build keeps the public pitch front page at `docs-site/dist/index.html`, keeps a compatibility redirect at `docs-site/dist/pitch`, and builds the separate Slidev deck into `docs-site/dist/pitch/deck`. The deck is a pitch artifact for talks and reviews, linked from the front page.
+## GitHub Actions
 
-Preview the pitch deck while editing it:
+- `Deploy docs` builds and publishes the documentation site.
+- `Test toolkit` validates the PowerShell script, common module, tests, sample config, docs dependency audit, and docs build.
 
-```powershell
-Set-Location .\docs-site
-npm run slides
-```
+## Roadmap Work
 
-Documentation examples should use placeholders instead of tenant-specific Azure details, real IP addresses, or local machine paths.
-
-## Documentation Requirement
-
-Every new user-facing feature must include documentation updates in the same change. Do not add a flag, config option, deployment behavior, sample source, security guardrail, or exported command without documenting how a beginner should discover and use it.
-
-Use this checklist when adding a feature:
-
-- update `README.md` when the feature affects the project summary, quick examples, security posture, or credits
-- update `Getting-Started.md` when the feature belongs in the beginner workflow
-- update the docs-site page that owns the feature area, or add a new page when the feature needs dedicated explanation
-- update `docs-site/src/content/docs/command-reference.mdx` for new public commands, parameters, aliases, defaults, or examples
-- update security documentation when the feature downloads code/data, changes exposure, handles secrets, creates jobs, or consumes storage
-- update architecture/deployment-flow/guest-setup docs when new files, guest scripts, or deployment steps are added
-- include credits, source links, license notes, and storage/cost warnings for third-party scripts or sample data; update [Third-party Notices](/azure-sqlvm-toolkit/third-party-notices/) when new upstream tools or datasets are added
-- rebuild the docs site with `npm run build` before considering the work done
-
-## GitHub Pages Workflow
-
-The repository includes a workflow at:
-
-```text
-.github/workflows/deploy-docs.yml
-```
-
-It checks out the repo, installs Node dependencies in `docs-site`, builds Starlight, uploads `docs-site/dist`, and deploys it to GitHub Pages.
-
-## Contributor Credit
-
-The project is MIT licensed. Kay Sauter is the main developer. Contributors will be credited by name unless consent for that is not given.
-
-## Implementation Guidelines
-
-When adding features:
-
-- keep security-minded defaults and call out known secret-generation tradeoffs
-- add `-Plan` output for beginner visibility
-- preserve `-WhatIf` and `ShouldProcess` behavior for mutating steps
-- update documentation in the same change
-- keep environment-specific Azure data in ignored local files
-- prefer generated names with narrow overrides
-- keep public functions small and document new exported commands
-- add tests for config validation, naming, security assessment, and guardrails
+When Azure create/reuse internals move behind smaller `Ensure-*` functions, add mocked Pester coverage and update the command/config docs in the same change set.

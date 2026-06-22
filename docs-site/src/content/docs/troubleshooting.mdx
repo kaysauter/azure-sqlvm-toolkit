@@ -1,191 +1,42 @@
 ---
 title: Troubleshooting
-description: Common issues and safe fixes.
+description: Common current-script issues.
 ---
 
-Start with non-mutating checks:
+## Missing `powershell-yaml`
 
-```powershell
-.\scripts\Test-Local.ps1 -ConfigFile .\config.local.yaml
-New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -Plan
-```
-
-## No Azure Context
-
-Symptom:
-
-```text
-No Azure context found. Run Connect-AzAccount first.
-```
-
-Fix:
-
-```powershell
-Connect-AzAccount
-Set-AzContext -SubscriptionName "Your Subscription"
-```
-
-`-Plan` does not need an Azure context. `-WhatIf` can run without one, but it will only show config-derived operations.
-
-## Module Not Found
-
-`Install-Module -Name Az` installs the Azure PowerShell dependency, not this toolkit.
-
-If PowerShell cannot find the module by name:
-
-```powershell
-Get-Module -ListAvailable -Name AzureSqlVmToolkit
-```
-
-An empty result means the module is not installed on your module path. From a cloned repository, import it by manifest path:
-
-```powershell
-Import-Module .\AzureSqlVmToolkit.psd1 -Force
-```
-
-Then check whether it is imported in the current session:
-
-```powershell
-Get-Module -Name AzureSqlVmToolkit
-Get-Command -Module AzureSqlVmToolkit
-```
-
-You can also validate the manifest:
-
-```powershell
-Test-ModuleManifest -Path .\AzureSqlVmToolkit.psd1
-```
-
-If you want `Get-Module -ListAvailable -Name AzureSqlVmToolkit` to return the toolkit on macOS before it is published, copy the module into your current-user module path:
-
-```powershell
-$modulePath = ($env:PSModulePath -split [IO.Path]::PathSeparator)[0]
-$target = Join-Path $modulePath "AzureSqlVmToolkit"
-New-Item -ItemType Directory -Path $target -Force | Out-Null
-Copy-Item .\AzureSqlVmToolkit.psd1, .\AzureSqlVmToolkit.psm1, .\config.yaml, .\LICENSE -Destination $target -Force
-Copy-Item .\Public, .\Private, .\templates -Destination $target -Recurse -Force
-Get-Module -ListAvailable -Name AzureSqlVmToolkit
-```
-
-For day-to-day development, importing `.\AzureSqlVmToolkit.psd1` by path is simpler and avoids stale copied files.
-
-## Azure PowerShell Missing
-
-If Azure commands such as `Connect-AzAccount` are missing, install and check the `Az` module:
-
-```powershell
-Install-Module -Name Az -Scope CurrentUser -Force
-Get-Module -ListAvailable -Name Az
-```
-
-An install command that returns no output may still have succeeded. Use `Get-Module -ListAvailable -Name Az` to verify.
-
-## `powershell-yaml` Missing
-
-The toolkit requires `powershell-yaml` to parse YAML configuration, but it does not install modules for you. Install it explicitly:
+Install it:
 
 ```powershell
 Install-Module -Name powershell-yaml -Scope CurrentUser -Force
 ```
 
-## Legacy Key Vault Blocked
+## No Azure Context
 
-Symptom:
-
-```text
-keyVault.useRbacAuthorization is false
-```
-
-Preferred fix:
-
-```yaml
-keyVault:
-  useRbacAuthorization: true
-```
-
-Fix:
+Real deployment requires:
 
 ```powershell
-Test-AzureSqlVmToolkitConfig -ConfigFile .\config.local.yaml
+Connect-AzAccount
 ```
 
-Set `keyVault.useRbacAuthorization` to `true` or remove the setting. If you are reusing an existing Key Vault that still uses legacy access policies, migrate it to RBAC authorization or choose a new RBAC-enabled vault name.
+`-Plan` does not require Azure sign-in.
 
-## Invalid Storage Account Name
+## Missing VM Password Secret
 
-Storage account names must use lowercase letters and numbers only, 3 to 24 characters.
+Create the secret in Key Vault before deploying, or use `-GeneratePassword` for a disposable lab.
 
-Prefer removing the override and letting the toolkit derive the name. If you must override it:
+## Legacy Key Vault Access Policies
 
-```yaml
-naming:
-  overrides:
-    storageAccountName: "stmydemo01"
-```
+The script rejects existing Key Vaults that do not use RBAC authorization. Use a different vault name or migrate the vault.
 
-## Invalid Key Vault Name
+## Broad RDP Or SQL Rule Rejected
 
-Key Vault names must be 3 to 24 characters, use letters, numbers, and hyphens, start with a letter, and end with a letter or number.
+Validation rejects inbound `3389` and `1433` from broad sources. Keep Bastion-only access or restrict the source prefix.
 
-If Azure reports the name is soft-deleted, the toolkit may create a numbered variant and tell you the new name. Put that name in `naming.overrides.keyVaultName` if you want to reuse it later.
+## Local Checks
 
-## RBAC Propagation
-
-Key Vault role assignments can take time to become usable. The deployment waits after assigning Key Vault permissions, but Azure propagation can still be slow.
-
-If guest setup cannot read the storage-key secret, wait a few minutes and rerun the deployment.
-
-## Guest Setup Fails
-
-Check:
-
-- the VM exists and the Azure VM agent is healthy
-- the VM has a managed identity
-- the VM identity has Key Vault access to the storage-key secret
-- outbound internet access is available if using the default Chocolatey bootstrap
-- the configured drive letter is not already used by something important
-
-Then rerun with `-WhatIf` and deploy again after reviewing the plan.
-
-## File Share Does Not Mount
-
-The mount script stores a startup scheduled task named `MountAzureFileShare`.
-
-Common causes:
-
-- Key Vault permission has not propagated
-- storage-key secret is missing or stale
-- storage account firewall rules block SMB access
-- port 445 is blocked by network policy
-- drive letter is already mapped
-
-## Pester Or PSScriptAnalyzer Skipped
-
-`scripts/Test-Local.ps1` skips optional tools when they are not installed.
-
-```powershell
-Install-Module -Name Pester -Scope CurrentUser -Force
-Install-Module -Name PSScriptAnalyzer -Scope CurrentUser -Force
-```
-
-Then rerun:
+Run:
 
 ```powershell
 .\scripts\Test-Local.ps1 -ConfigFile .\config.local.yaml
-```
-
-## Docs Site Does Not Start
-
-From the repository root:
-
-```powershell
-Set-Location .\docs-site
-npm install
-npm run dev
-```
-
-Then open:
-
-```text
-http://localhost:4321/azure-sqlvm-toolkit/
 ```

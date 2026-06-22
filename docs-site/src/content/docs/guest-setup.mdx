@@ -1,184 +1,40 @@
 ---
 title: Guest Setup
-description: Software installation, Azure Files mounting, and database restore behavior inside the VM.
+description: Software installation, file-share mount, and restore helper.
 ---
 
-Guest setup runs through Azure VM Run Command after the VM and storage resources are ready.
+Guest setup runs through Azure VM Run Command after the VM exists.
 
-The default setup uses several upstream tools. See [Third-party Notices](/azure-sqlvm-toolkit/third-party-notices/) for public credits, source links, and license reminders for Chocolatey, dbatools, PowerShell, Git, Tabular Editor, 7-Zip, and the SQL community projects used by optional installers.
+## Install Script
 
-## Software Install Script
+The current sample config:
 
-Default source:
+- Sets process execution policy to bypass.
+- Enables TLS 1.2.
+- Downloads Chocolatey's bootstrap script to a temporary file.
+- Executes that temporary file.
+- Installs `git`, `powershell-core`, and `tabular-editor`.
+- Installs NuGet package provider.
+- Installs `dbatools`.
 
-```text
-templates/guest/install-software.ps1
-```
+This is lab convenience. Pin or mirror installers for stronger environments.
 
-Current default behavior:
+## Logon Script
 
-- sets process execution policy to bypass
-- enables TLS 1.2 for the current process
-- downloads Chocolatey's bootstrap script to a temporary file
-- executes that temporary file
-- removes the temporary file
-- refreshes the process path
-- installs Chocolatey packages: `git`, `powershell-core`, `tabular-editor`
-- installs the NuGet package provider
-- installs the PowerShell module `dbatools`
-
-Supply-chain note: this is acceptable for demos and learning environments, but production deployments should pin package versions and verify downloaded installer content.
-
-## Logon Task
-
-Default logon script:
+The sample logon script installs the SQL Server VS Code extension:
 
 ```powershell
 code --install-extension ms-mssql.mssql
 ```
 
-When `softwareInstalls.logonScript` is present, the toolkit registers a scheduled task for the configured VM user. The task runs at user logon, executes the script, unregisters itself, and removes its temporary script file.
-
-If you rely on the default `code` command, make sure your install script provides VS Code or replace the logon script with one that matches your image.
+Only use trusted logon script content.
 
 ## Azure Files Mount
 
-Default source:
+The VM managed identity retrieves the storage-key secret from Key Vault and mounts Azure Files to the configured drive letter. The mount script is also registered as a startup scheduled task.
 
-```text
-templates/guest/mount-fileshare.ps1
-```
+## Restore Helper
 
-The mount script:
+The script uploads `restore-databases.ps1` to the Azure Files share. It restores `.bak` files from the configured backup path using dbatools.
 
-1. Requests a managed identity token from the Azure Instance Metadata Service.
-2. Calls Key Vault with that token.
-3. Reads the configured storage-key secret.
-4. Creates an SMB credential from the storage account name and key.
-5. Removes any existing global mapping for the target drive letter.
-6. Creates a persistent SMB global mapping to Azure Files.
-7. Writes a startup script to `C:\mount-fileshare.ps1`.
-8. Registers a startup scheduled task named `MountAzureFileShare`.
-
-The VM needs Key Vault secret read access for the storage-key secret. The toolkit grants that access during deployment.
-
-## Restore Script
-
-Default source:
-
-```text
-templates/guest/restore-databases.ps1
-```
-
-The toolkit validates `storage.backupPath`, renders a quoted backup-root path under the mounted drive, then uploads the script to the Azure Files share as:
-
-```text
-restore-databases.ps1
-```
-
-Inside the VM, run:
-
-```powershell
-Z:\restore-databases.ps1
-```
-
-The script imports `dbatools`, finds `.bak` files under the configured backup path with `-LiteralPath`, and calls `Restore-DbaDatabase` against `localhost` with `-WithReplace`.
-
-## Local Backup Restore Script
-
-Default source:
-
-```text
-templates/guest/restore-local-backups.ps1
-```
-
-This script is generated and uploaded only when `localBackups.enabled` is `true`.
-
-The toolkit uploads local backup files, `manifest.json`, and `restore-local-backups.ps1` under a timestamped Azure Files folder such as:
-
-```text
-local-backups/20260528-153045Z-a1b2c3/
-```
-
-Inside the VM, run the generated path printed by deployment:
-
-```powershell
-Z:\local-backups\<timestamp>-<nonce>\restore-local-backups.ps1
-Z:\local-backups\<timestamp>-<nonce>\restore-local-backups.ps1 -Execute
-```
-
-The first command previews the restore sources and dbatools command shape. The second command performs the restore. The script adds dbatools overwrite behavior only when `localBackups.replaceExisting` is `true`.
-
-The toolkit does not auto-run this script through VM Run Command, Custom Script Extension, SQL Agent, or a scheduled task. Manual execution keeps v1 restores out of the VM SYSTEM account.
-
-## Sample Database Installer
-
-Default source:
-
-```text
-templates/guest/install-sample-databases.ps1
-```
-
-This script only runs when `New-AzureSqlVmToolkitDeployment` receives `-InstallSampleDb`.
-
-The installer:
-
-- receives a JSON payload from the module's allowlisted sample database catalog
-- downloads selected files to `C:\SQLSampleDatabases`
-- extracts `.7z` archives with 7-Zip when needed
-- imports `dbatools`
-- skips a restore when the target database already exists
-- restores missing sample databases to `localhost`
-
-For compressed SQLBI Contoso backups, the script installs 7-Zip with Chocolatey if 7-Zip is not already available on the VM. Review sample sources and licenses before enabling sample installation.
-
-## First Responder Kit Installer
-
-Default source:
-
-```text
-templates/guest/install-first-responder-kit.ps1
-```
-
-This script only runs when `New-AzureSqlVmToolkitDeployment` receives `-InstallFirstResponderKit`.
-
-The installer:
-
-- imports `dbatools`
-- calls `Install-DbaFirstResponderKit`
-- runs Brent Ozar Unlimited's upstream `Install-All-Scripts.sql`
-- installs or updates the First Responder Kit stored procedures in the target database
-- verifies that expected procedures exist after installation
-
-Review Brent Ozar Unlimited's source, license, and release notes before enabling this feature. For production-grade reproducibility, use a pinned or internally approved script copy rather than a live download.
-
-## Maintenance Solution Installer
-
-Default source:
-
-```text
-templates/guest/install-maintenance-solution.ps1
-```
-
-This script only runs when `New-AzureSqlVmToolkitDeployment` receives `-InstallMaintenanceSolution`.
-
-The installer:
-
-- imports `dbatools`
-- calls `Install-DbaMaintenanceSolution`
-- installs or updates Ola Hallengren's Maintenance Solution procedures
-- optionally installs SQL Agent jobs when `-InstallMaintenanceSolutionJobs` is supplied
-- verifies that expected procedures exist after installation
-
-SQL Agent jobs are not installed by default because backup jobs can consume significant storage. If jobs are enabled, review backup location, cleanup time, schedules, and available VM disk or Azure Files capacity.
-
-## Customization
-
-You can replace:
-
-- `softwareInstalls.installScript`
-- `softwareInstalls.logonScript`
-- `storage.driveLetter`
-- `storage.backupPath`
-
-When sharing or committing custom scripts, keep them free of embedded passwords, storage keys, tokens, tenant IDs, and personal endpoint values. Put runtime secrets in Key Vault or another managed secret store.
+Run it manually inside the VM after reviewing the backup files.
