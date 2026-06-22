@@ -67,6 +67,23 @@ function Write-ToolkitDeploymentStep {
     return $result
 }
 
+function Test-ToolkitStepSkipped {
+    param(
+        [Parameter(Mandatory = $false)]
+        [object]$Step,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Message
+    )
+
+    if ($Step -and $Step.Status -eq "Skipped") {
+        Write-ToolkitWarning -Message $Message
+        return $true
+    }
+
+    return $false
+}
+
 function Get-ToolkitDeploymentContext {
     param(
         [Parameter(Mandatory = $true)]
@@ -307,6 +324,10 @@ function Ensure-ToolkitVirtualNetwork {
             param($ResourceGroupName, $Name)
             Get-AzVirtualNetwork -ResourceGroupName $ResourceGroupName -Name $Name -ErrorAction SilentlyContinue
         },
+        [scriptblock]$NewSubnetConfig = {
+            param($SubnetName, $AddressPrefix)
+            New-AzVirtualNetworkSubnetConfig -Name $SubnetName -AddressPrefix $AddressPrefix
+        },
         [scriptblock]$NewVirtualNetwork = {
             param($ResourceGroupName, $Location, $Name, $AddressPrefix, $SubnetConfig)
             New-AzVirtualNetwork -ResourceGroupName $ResourceGroupName -Location $Location -Name $Name -AddressPrefix $AddressPrefix -Subnet $SubnetConfig
@@ -321,29 +342,21 @@ function Ensure-ToolkitVirtualNetwork {
     $subnetId = "$resourceId/subnets/$($Names.SubnetName)"
     $vnet = & $GetVirtualNetwork $Names.ResourceGroupName $Names.VnetName
     if (-not $vnet) {
-        if (-not $WhatIfPreference) {
-            throw "Virtual network '$($Names.VnetName)' was not found before Bastion reconciliation."
-        }
-
-        $vnetId = Get-ToolkitPredictedResourceId -SubscriptionId $SubscriptionId -ResourceGroupName $Names.ResourceGroupName -ProviderPath "Microsoft.Network/virtualNetworks/$($Names.VnetName)"
-        $vnet = [pscustomobject]@{
-            Id      = $vnetId
-            Subnets = @()
-        }
-    }
-    if (-not $vnet) {
         if ($WhatIfPreference) {
             $step = Write-ToolkitDeploymentStep -Name "Virtual network" -Status "WouldCreate" -Message "Would create '$($Names.VnetName)' and subnet '$($Names.SubnetName)'." -ResourceId $resourceId -Detail @{ SubnetId = $subnetId }
             return [pscustomobject]@{ Resource = [pscustomobject]@{ Id = $resourceId; Subnets = @([pscustomobject]@{ Name = $Names.SubnetName; Id = $subnetId }) }; SubnetId = $subnetId; Step = $step }
         }
 
         if ($PSCmdlet.ShouldProcess($Names.VnetName, "Create virtual network")) {
-            $subnetConfig = New-AzVirtualNetworkSubnetConfig -Name $Names.SubnetName -AddressPrefix $Config.network.subnet.addressPrefix
+            $subnetConfig = & $NewSubnetConfig $Names.SubnetName $Config.network.subnet.addressPrefix
             $vnet = & $NewVirtualNetwork $Names.ResourceGroupName $Location $Names.VnetName $Config.network.vnet.addressPrefix $subnetConfig
             $subnet = $vnet.Subnets | Where-Object { $_.Name -eq $Names.SubnetName } | Select-Object -First 1
             $step = Write-ToolkitDeploymentStep -Name "Virtual network" -Status "Created" -Message "'$($Names.VnetName)' created." -ResourceId $vnet.Id -Detail @{ Resource = $vnet; SubnetId = $subnet.Id }
             return [pscustomobject]@{ Resource = $vnet; SubnetId = $subnet.Id; Step = $step }
         }
+
+        $step = Write-ToolkitDeploymentStep -Name "Virtual network" -Status "Skipped" -Message "'$($Names.VnetName)' was not created." -ResourceId $resourceId -Detail @{ SubnetId = $subnetId }
+        return [pscustomobject]@{ Resource = $null; SubnetId = $subnetId; Step = $step }
     }
 
     $prefix = ($vnet.AddressSpace.AddressPrefixes | Select-Object -First 1)
@@ -363,6 +376,9 @@ function Ensure-ToolkitVirtualNetwork {
             $step = Write-ToolkitDeploymentStep -Name "Virtual network subnet" -Status "Updated" -Message "Subnet '$($Names.SubnetName)' added." -ResourceId $subnet.Id -Detail @{ Resource = $vnet; SubnetId = $subnet.Id }
             return [pscustomobject]@{ Resource = $vnet; SubnetId = $subnet.Id; Step = $step }
         }
+
+        $step = Write-ToolkitDeploymentStep -Name "Virtual network subnet" -Status "Skipped" -Message "Subnet '$($Names.SubnetName)' was not added." -ResourceId $subnetId -Detail @{ Resource = $vnet; SubnetId = $subnetId }
+        return [pscustomobject]@{ Resource = $vnet; SubnetId = $subnetId; Step = $step }
     }
 
     $subnetDrift = Compare-ToolkitResourceProperty -ResourceName "Subnet '$($Names.SubnetName)'" -PropertyName "AddressPrefix" -ExpectedValue $Config.network.subnet.addressPrefix -ActualValue $subnet.AddressPrefix -DriftPolicy "Fail"
@@ -493,6 +509,8 @@ function Ensure-ToolkitNetworkSecurityGroup {
             $nsg = & $NewNetworkSecurityGroup $params
             return Write-ToolkitDeploymentStep -Name "Network security group" -Status "Created" -Message "'$($Names.NsgName)' created." -ResourceId $nsg.Id -Detail @{ Resource = $nsg }
         }
+
+        return Write-ToolkitDeploymentStep -Name "Network security group" -Status "Skipped" -Message "'$($Names.NsgName)' was not created." -ResourceId $resourceId
     }
 
     $missingRules = @()
@@ -504,10 +522,20 @@ function Ensure-ToolkitNetworkSecurityGroup {
             continue
         }
 
-        foreach ($property in @("Protocol", "Direction", "Priority", "Access")) {
-            $expected = Get-ToolkitConfigValue -Config $rule -Path ($property.Substring(0, 1).ToLowerInvariant() + $property.Substring(1))
-            $actual = $existingRule.$property
-            $drift = Compare-ToolkitResourceProperty -ResourceName "NSG rule '$($rule.name)'" -PropertyName $property -ExpectedValue $expected -ActualValue $actual -DriftPolicy "Fail"
+        $ruleComparisons = @(
+            @{ Property = "Protocol"; ConfigPath = "protocol" },
+            @{ Property = "Direction"; ConfigPath = "direction" },
+            @{ Property = "Priority"; ConfigPath = "priority" },
+            @{ Property = "SourceAddressPrefix"; ConfigPath = "sourceAddressPrefix" },
+            @{ Property = "SourcePortRange"; ConfigPath = "sourcePortRange" },
+            @{ Property = "DestinationAddressPrefix"; ConfigPath = "destinationAddressPrefix" },
+            @{ Property = "DestinationPortRange"; ConfigPath = "destinationPortRange" },
+            @{ Property = "Access"; ConfigPath = "access" }
+        )
+        foreach ($comparison in $ruleComparisons) {
+            $expected = Get-ToolkitConfigValue -Config $rule -Path $comparison.ConfigPath
+            $actual = $existingRule.($comparison.Property)
+            $drift = Compare-ToolkitResourceProperty -ResourceName "NSG rule '$($rule.name)'" -PropertyName $comparison.Property -ExpectedValue $expected -ActualValue $actual -DriftPolicy "Fail"
             Assert-ToolkitNoBlockingDrift -Result $drift
         }
     }
@@ -521,6 +549,8 @@ function Ensure-ToolkitNetworkSecurityGroup {
             $nsg = & $UpdateNetworkSecurityGroup $nsg $missingRules
             return Write-ToolkitDeploymentStep -Name "Network security group" -Status "Updated" -Message "Added $($missingRules.Count) missing NSG rule(s)." -ResourceId $nsg.Id -Detail @{ Resource = $nsg; MissingRules = $missingRules.Count }
         }
+
+        return Write-ToolkitDeploymentStep -Name "Network security group" -Status "Skipped" -Message "Missing NSG rules were not added to '$($Names.NsgName)'." -ResourceId $nsg.Id -Detail @{ Resource = $nsg; MissingRules = $missingRules.Count }
     }
 
     return Write-ToolkitDeploymentStep -Name "Network security group" -Status "Reused" -Message "'$($Names.NsgName)' already matches config." -ResourceId $nsg.Id -Detail @{ Resource = $nsg }
@@ -704,6 +734,18 @@ function Ensure-ToolkitBastion {
     )
 
     $vnet = & $GetVirtualNetwork $Names.ResourceGroupName $Names.VnetName
+    if (-not $vnet) {
+        if (-not $WhatIfPreference) {
+            throw "Virtual network '$($Names.VnetName)' was not found before Bastion reconciliation."
+        }
+
+        $vnetId = Get-ToolkitPredictedResourceId -SubscriptionId $SubscriptionId -ResourceGroupName $Names.ResourceGroupName -ProviderPath "Microsoft.Network/virtualNetworks/$($Names.VnetName)"
+        $vnet = [pscustomobject]@{
+            Id      = $vnetId
+            Subnets = @()
+        }
+    }
+
     $bastionSubnet = $vnet.Subnets | Where-Object { $_.Name -eq $Names.BastionSubnetName } | Select-Object -First 1
     if (-not $bastionSubnet) {
         $subnetId = "$($vnet.Id)/subnets/$($Names.BastionSubnetName)"
@@ -713,6 +755,9 @@ function Ensure-ToolkitBastion {
         elseif ($PSCmdlet.ShouldProcess($Names.VnetName, "Add Bastion subnet")) {
             $vnet = & $AddSubnet $vnet $Names.BastionSubnetName $Config.bastion.subnetAddressPrefix
             Write-ToolkitDeploymentStep -Name "Bastion subnet" -Status "Updated" -Message "'$($Names.BastionSubnetName)' added." -ResourceId $subnetId | Out-Null
+        }
+        else {
+            return Write-ToolkitDeploymentStep -Name "Bastion subnet" -Status "Skipped" -Message "'$($Names.BastionSubnetName)' was not added." -ResourceId $subnetId
         }
     }
     else {
@@ -786,28 +831,33 @@ function Ensure-ToolkitStorage {
 
     $resourceId = Get-ToolkitPredictedResourceId -SubscriptionId $SubscriptionId -ResourceGroupName $Names.StorageResourceGroupName -ProviderPath "Microsoft.Storage/storageAccounts/$($Names.StorageAccountName)"
     $account = & $GetStorageAccount $Names.StorageResourceGroupName $Names.StorageAccountName
+    $accountStep = $null
     if ($account) {
         $skuName = if ($account.Sku.Name) { $account.Sku.Name } else { $account.SkuName }
         $drift = Compare-ToolkitResourceProperty -ResourceName "Storage account '$($Names.StorageAccountName)'" -PropertyName "SkuName" -ExpectedValue $Config.storage.skuName -ActualValue $skuName -DriftPolicy "Warn"
         if ($drift.Status -eq "DriftDetected") {
             Write-ToolkitDrift -Message $drift.Message
         }
-        Write-ToolkitDeploymentStep -Name "Storage account" -Status "Reused" -Message "'$($Names.StorageAccountName)' already exists." -ResourceId $account.Id -Detail @{ Resource = $account } | Out-Null
+        $accountStep = Write-ToolkitDeploymentStep -Name "Storage account" -Status "Reused" -Message "'$($Names.StorageAccountName)' already exists." -ResourceId $account.Id -Detail @{ Resource = $account }
     }
     else {
         if ($WhatIfPreference) {
-            Write-ToolkitDeploymentStep -Name "Storage account" -Status "WouldCreate" -Message "Would create '$($Names.StorageAccountName)'." -ResourceId $resourceId | Out-Null
+            $accountStep = Write-ToolkitDeploymentStep -Name "Storage account" -Status "WouldCreate" -Message "Would create '$($Names.StorageAccountName)'." -ResourceId $resourceId
             $account = [pscustomobject]@{ Id = $resourceId }
         }
         elseif ($PSCmdlet.ShouldProcess($Names.StorageAccountName, "Create storage account")) {
             $account = & $NewStorageAccount $Names.StorageResourceGroupName $Names.StorageAccountName $Location $Config.storage.skuName
-            Write-ToolkitDeploymentStep -Name "Storage account" -Status "Created" -Message "'$($Names.StorageAccountName)' created." -ResourceId $account.Id -Detail @{ Resource = $account } | Out-Null
+            $accountStep = Write-ToolkitDeploymentStep -Name "Storage account" -Status "Created" -Message "'$($Names.StorageAccountName)' created." -ResourceId $account.Id -Detail @{ Resource = $account }
+        }
+        else {
+            $accountStep = Write-ToolkitDeploymentStep -Name "Storage account" -Status "Skipped" -Message "'$($Names.StorageAccountName)' was not created." -ResourceId $resourceId
+            return [pscustomobject]@{ Account = $null; Context = $null; AccountKey = $null; AccountStep = $accountStep; ShareStep = $null }
         }
     }
 
     if ($WhatIfPreference) {
         $shareStep = Write-ToolkitDeploymentStep -Name "Storage share" -Status "WouldCreate" -Message "Would ensure file share '$($Names.FileShareName)'." -ResourceId "$resourceId/fileServices/default/shares/$($Names.FileShareName)"
-        return [pscustomobject]@{ Account = $account; Context = $null; AccountKey = $null; ShareStep = $shareStep }
+        return [pscustomobject]@{ Account = $account; Context = $null; AccountKey = $null; AccountStep = $accountStep; ShareStep = $shareStep }
     }
 
     $accountKey = (& $GetStorageAccountKey $Names.StorageResourceGroupName $Names.StorageAccountName)[0].Value
@@ -830,7 +880,7 @@ function Ensure-ToolkitStorage {
         $shareStep = Write-ToolkitDeploymentStep -Name "Storage share" -Status "Skipped" -Message "'$($Names.FileShareName)' was not created."
     }
 
-    return [pscustomobject]@{ Account = $account; Context = $context; AccountKey = $accountKey; ShareStep = $shareStep }
+    return [pscustomobject]@{ Account = $account; Context = $context; AccountKey = $accountKey; AccountStep = $accountStep; ShareStep = $shareStep }
 }
 
 function Get-ToolkitGuestInstallScript {
@@ -918,7 +968,7 @@ function Ensure-ToolkitGuestSetup {
         [Parameter(Mandatory = $true)][object]$Config,
         [Parameter(Mandatory = $true)][object]$Names,
         [Parameter(Mandatory = $true)][string]$KeyVaultName,
-        [Parameter(Mandatory = $true)][object]$StorageContext,
+        [Parameter(Mandatory = $false)][object]$StorageContext,
         [scriptblock]$InvokeVmRunCommand = {
             param($ResourceGroupName, $VMName, $ScriptString, $Parameters)
             if ($Parameters) {
@@ -936,6 +986,10 @@ function Ensure-ToolkitGuestSetup {
 
     foreach ($warning in @(Get-ToolkitGuestSetupWarning -Config $Config)) {
         Write-ToolkitWarning -Message $warning
+    }
+
+    if (-not $WhatIfPreference -and -not $StorageContext) {
+        return Write-ToolkitDeploymentStep -Name "Guest setup" -Status "Skipped" -Message "Storage context is unavailable, so guest setup and restore-helper upload were skipped."
     }
 
     if ($WhatIfPreference) {
@@ -1077,6 +1131,9 @@ function Invoke-AzureSqlVmToolkitDeployment {
         -WhatIf:$WhatIfPreference
 
     $vnetResult = Ensure-ToolkitVirtualNetwork -Config $config -Names $names -Location $location -SubscriptionId $subscriptionId -WhatIf:$WhatIfPreference
+    if (Test-ToolkitStepSkipped -Step $vnetResult.Step -Message "Stopping deployment because the virtual network step was skipped.") {
+        return
+    }
 
     $publicIpId = $null
     if ($deployment.VmPublicIpEnabled) {
@@ -1097,6 +1154,9 @@ function Invoke-AzureSqlVmToolkitDeployment {
     }
 
     $nsgStep = Ensure-ToolkitNetworkSecurityGroup -Config $config -Names $names -Location $location -SubscriptionId $subscriptionId -WhatIf:$WhatIfPreference
+    if (Test-ToolkitStepSkipped -Step $nsgStep -Message "Stopping deployment because the network security group step was skipped.") {
+        return
+    }
     $nsgId = if ($nsgStep.Detail.Resource) { $nsgStep.Detail.Resource.Id } else { $nsgStep.ResourceId }
 
     $nicStep = Ensure-ToolkitNetworkInterface `
@@ -1107,6 +1167,9 @@ function Invoke-AzureSqlVmToolkitDeployment {
         -PublicIpAddressId $publicIpId `
         -SubscriptionId $subscriptionId `
         -WhatIf:$WhatIfPreference
+    if (Test-ToolkitStepSkipped -Step $nicStep -Message "Stopping deployment because the network interface step was skipped.") {
+        return
+    }
     $nicId = if ($nicStep.Detail.Resource) { $nicStep.Detail.Resource.Id } else { $nicStep.ResourceId }
 
     $vmStep = Ensure-ToolkitVirtualMachine `
@@ -1117,9 +1180,15 @@ function Invoke-AzureSqlVmToolkitDeployment {
         -AdminPassword $passwordResult.SecretValue `
         -SubscriptionId $subscriptionId `
         -WhatIf:$WhatIfPreference
+    if (Test-ToolkitStepSkipped -Step $vmStep -Message "Stopping deployment because the virtual machine step was skipped.") {
+        return
+    }
     $vm = if ($vmStep.Detail.Resource) { $vmStep.Detail.Resource } else { [pscustomobject]@{ Id = $vmStep.ResourceId; Identity = $null } }
 
     $identityStep = Ensure-ToolkitVmManagedIdentity -ResourceGroupName $names.ResourceGroupName -VMName $names.VMName -VirtualMachine $vm -WhatIf:$WhatIfPreference
+    if (Test-ToolkitStepSkipped -Step $identityStep -Message "Stopping deployment because the VM managed identity step was skipped.") {
+        return
+    }
     $vmIdentity = $identityStep.Detail.PrincipalId
 
     Ensure-ToolkitBastion -Config $config -Names $names -Location $location -SubscriptionId $subscriptionId -WhatIf:$WhatIfPreference | Out-Null
@@ -1132,7 +1201,12 @@ function Invoke-AzureSqlVmToolkitDeployment {
         -SubscriptionId $subscriptionId `
         -WhatIf:$WhatIfPreference
 
-    Ensure-ToolkitRoleAssignment -ObjectId $vmIdentity -RoleDefinitionName "Key Vault Secrets User" -Scope $keyVaultResult.Resource.ResourceId -WhatIf:$WhatIfPreference | Out-Null
+    if (-not [string]::IsNullOrWhiteSpace([string]$vmIdentity)) {
+        Ensure-ToolkitRoleAssignment -ObjectId $vmIdentity -RoleDefinitionName "Key Vault Secrets User" -Scope $keyVaultResult.Resource.ResourceId -WhatIf:$WhatIfPreference | Out-Null
+    }
+    else {
+        Write-ToolkitWarning -Message "VM identity principal ID was not available; skipping Key Vault Secrets User assignment."
+    }
 
     Ensure-ToolkitGuestSetup -Config $config -Names $names -KeyVaultName $effectiveKeyVaultName -StorageContext $storageResult.Context -WhatIf:$WhatIfPreference | Out-Null
 

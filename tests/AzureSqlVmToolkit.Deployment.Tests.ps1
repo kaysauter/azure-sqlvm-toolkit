@@ -87,6 +87,57 @@ Describe "Deployment Ensure functions" {
         $result.Status | Should -Be "Reused"
     }
 
+    It "creates a missing virtual network through injected Azure commands" {
+        $config = Get-DeploymentTestConfig
+        $names = [pscustomobject]@{
+            ResourceGroupName = "toolkit-rg"
+            VnetName          = "toolkit-rg-vnet"
+            SubnetName        = "toolkit-rg-subnet"
+        }
+
+        $result = Ensure-ToolkitVirtualNetwork `
+            -Config $config `
+            -Names $names `
+            -Location "switzerlandnorth" `
+            -GetVirtualNetwork { $null } `
+            -NewSubnetConfig {
+                param($SubnetName, $AddressPrefix)
+                [pscustomobject]@{ Name = $SubnetName; AddressPrefix = $AddressPrefix }
+            } `
+            -NewVirtualNetwork {
+                param($ResourceGroupName, $Location, $Name, $AddressPrefix, $SubnetConfig)
+                [pscustomobject]@{
+                    Id           = "/resourceGroups/$ResourceGroupName/providers/Microsoft.Network/virtualNetworks/$Name"
+                    Location     = $Location
+                    AddressSpace = [pscustomobject]@{ AddressPrefixes = @($AddressPrefix) }
+                    Subnets      = @([pscustomobject]@{ Name = $SubnetConfig.Name; AddressPrefix = $SubnetConfig.AddressPrefix; Id = "/subnet" })
+                }
+            }
+
+        $result.Step.Status | Should -Be "Created"
+        $result.SubnetId | Should -Be "/subnet"
+    }
+
+    It "reports a missing virtual network as a WhatIf create" {
+        $config = Get-DeploymentTestConfig
+        $names = [pscustomobject]@{
+            ResourceGroupName = "toolkit-rg"
+            VnetName          = "toolkit-rg-vnet"
+            SubnetName        = "toolkit-rg-subnet"
+        }
+
+        $result = Ensure-ToolkitVirtualNetwork `
+            -Config $config `
+            -Names $names `
+            -Location "switzerlandnorth" `
+            -GetVirtualNetwork { $null } `
+            -NewVirtualNetwork { throw "should not create" } `
+            -WhatIf
+
+        $result.Step.Status | Should -Be "WouldCreate"
+        $result.SubnetId | Should -Match "/subnets/toolkit-rg-subnet$"
+    }
+
     It "reports missing NSG rules as an Azure-aware WhatIf update" {
         $names = [pscustomobject]@{
             ResourceGroupName = "toolkit-rg"
@@ -108,6 +159,39 @@ Describe "Deployment Ensure functions" {
 
         $result.Status | Should -Be "WouldUpdate"
         $result.Detail.MissingRules | Should -Be 1
+    }
+
+    It "fails early when an existing NSG rule drifts on destination port" {
+        $names = [pscustomobject]@{
+            ResourceGroupName = "toolkit-rg"
+            NsgName           = "toolkit-rg-nsg"
+        }
+        $nsg = [pscustomobject]@{
+            Id            = "/nsg"
+            SecurityRules = @(
+                [pscustomobject]@{
+                    Name                     = "allow-app"
+                    Protocol                 = "Tcp"
+                    Direction                = "Inbound"
+                    Priority                 = 1000
+                    SourceAddressPrefix      = "10.0.0.0/24"
+                    SourcePortRange          = "*"
+                    DestinationAddressPrefix = "*"
+                    DestinationPortRange     = "80"
+                    Access                   = "Allow"
+                }
+            )
+        }
+
+        {
+            Ensure-ToolkitNetworkSecurityGroup `
+                -Config (Get-DeploymentTestConfig) `
+                -Names $names `
+                -Location "switzerlandnorth" `
+                -GetNetworkSecurityGroup { $nsg } `
+                -NewNetworkSecurityGroup { throw "should not create" } `
+                -UpdateNetworkSecurityGroup { throw "should not update" }
+        } | Should -Throw -ExpectedMessage "*DestinationPortRange*"
     }
 
     It "fails early when an existing NIC points at the wrong subnet" {
@@ -176,6 +260,25 @@ Describe "Deployment Ensure functions" {
             -NewVm { throw "should not create" }
 
         $result.Status | Should -Be "Reused"
+    }
+
+    It "skips guest setup when storage context is unavailable" {
+        $names = [pscustomobject]@{
+            ResourceGroupName   = "toolkit-rg"
+            VMName              = "toolkit-rg-vm"
+            StorageAccountName  = "toolkitstore01"
+            FileShareName       = "sqlbackupshare"
+        }
+
+        $result = Ensure-ToolkitGuestSetup `
+            -Config (Get-DeploymentTestConfig) `
+            -Names $names `
+            -KeyVaultName "toolkit-kv" `
+            -StorageContext $null `
+            -InvokeVmRunCommand { throw "should not run guest commands" } `
+            -UploadStorageFile { throw "should not upload" }
+
+        $result.Status | Should -Be "Skipped"
     }
 }
 
