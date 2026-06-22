@@ -1,0 +1,80 @@
+---
+title: Generated Naming
+description: How AzSQLVMKit derives resource names and validates constraints.
+---
+
+AzSQLVMKit derives names from `project.name`, `project.environment`, optional `naming.prefix`, and `project.uniqueSuffix`.
+
+## Inputs
+
+```yaml
+project:
+  name: "sqlvm-demo"
+  environment: "dev"
+  location: "Switzerland North"
+  uniqueSuffix: "demo01"
+```
+
+The toolkit slugifies names by lowercasing and replacing unsupported characters. Storage account and computer names use a compact alphanumeric variant.
+
+If `project.uniqueSuffix` is omitted, the toolkit generates a stable six-character suffix from:
+
+```text
+project.name | project.environment | project.location
+```
+
+## Derived Name Patterns
+
+| Resolved field | Pattern |
+| --- | --- |
+| `ResourceGroupName` | `rg-<base>` |
+| `StorageResourceGroupName` | `rg-<base>-storage` |
+| `VnetName` | `vnet-<base>` |
+| `SubnetName` | `snet-<base>` |
+| `PipName` | `pip-<base>` |
+| `NsgName` | `nsg-<base>` |
+| `InterfaceName` | `nic-<base>` |
+| `VMName` | `vm-<base>` |
+| `ComputerName` | compact base, limited to 15 characters |
+| `BastionSubnetName` | `AzureBastionSubnet` |
+| `BastionPipName` | `pip-<base>-bastion` |
+| `BastionName` | `bas-<base>` |
+| `KeyVaultName` | `kv-<base>-<suffix>`, limited to 24 characters |
+| `StorageAccountName` | `st<compact-base><suffix>`, limited to 24 characters |
+| `FileShareName` | `sqlbackupshare` |
+
+`<base>` is built from:
+
+```text
+[naming.prefix-]project.name[-project.environment]
+```
+
+## Name Sources
+
+`-Plan` shows where each name came from:
+
+| Source | Meaning |
+| --- | --- |
+| `derived` | Generated from the project block. |
+| `explicit` | Read from a supported legacy config path. |
+| `override` | Read from `naming.overrides`. |
+
+## Validation Rules
+
+The config validator checks:
+
+- storage account names: lowercase letters and numbers, 3 to 24 characters
+- Key Vault names: 3 to 24 characters, letters/numbers/hyphens, starts with a letter, ends with a letter or number
+- Windows computer name: 1 to 15 characters, letters/numbers/hyphens, starts with a letter
+- drive letter: single uppercase letter
+
+## When To Override
+
+Use `naming.overrides` when:
+
+- reusing existing resources
+- meeting company naming standards
+- choosing globally unique Key Vault or storage account names
+- recovering from a soft-deleted Key Vault name conflict
+
+Keep overrides narrow. Let the toolkit derive everything else.

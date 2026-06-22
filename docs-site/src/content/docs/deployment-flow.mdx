@@ -1,0 +1,83 @@
+---
+title: Deployment Flow
+description: What happens when New-AzureSqlVmToolkitDeployment runs.
+---
+
+`New-AzureSqlVmToolkitDeployment` is the deployment orchestrator. It validates the config, resolves names, runs the security assessment, then creates missing Azure resources.
+
+## Before Azure Calls
+
+The command first:
+
+1. Imports the YAML config.
+2. Validates required values and naming constraints.
+3. Resolves the full configuration and generated names.
+4. Runs the security assessment.
+5. Blocks configs or existing Key Vaults that use legacy access-policy mode.
+
+If `-Plan` is supplied, the command prints resolved names and the deployment sequence, then exits without querying Azure.
+
+If no Azure context exists and `-WhatIf` is supplied, the command prints config-derived WhatIf operations and exits.
+
+With an Azure context, `-WhatIf` and deployment also run selected state-aware security checks against existing target NIC public IPs and broad RDP/SQL NSG rules before mutating resources.
+
+## Azure Deployment Order
+
+With an Azure context, the command runs in this order:
+
+1. Create or reuse the VM resource group.
+2. Create or reuse the storage resource group.
+3. Create or reuse the Key Vault.
+4. Grant the current principal secret permissions.
+5. Reuse the VM admin password secret. If it is missing, generate it in PowerShell only when `-GeneratePassword` is supplied.
+6. Create or reuse the VNet and VM subnet.
+7. Create or skip the VM public IP depending on config.
+8. Create or reuse the network security group.
+9. Create or reuse the network interface.
+10. Create or reuse the SQL Server VM.
+11. Enable system-assigned managed identity on the VM when needed.
+12. Create or reuse the Azure Bastion subnet, public IP, and Bastion host.
+13. Create or reuse the storage account.
+14. Read a storage account key and store it in Key Vault.
+15. Grant the VM managed identity access to the storage-key secret.
+16. Create or reuse the Azure Files share.
+17. Run guest setup through Azure VM Run Command.
+18. Upload `restore-databases.ps1` to the Azure Files share.
+19. Upload local backup files, `manifest.json`, and `restore-local-backups.ps1` when `localBackups.enabled` is true.
+20. Download and restore selected sample databases when `-InstallSampleDb` is supplied.
+21. Install or update Brent Ozar's First Responder Kit when `-InstallFirstResponderKit` is supplied.
+22. Install or update Ola Hallengren's Maintenance Solution when `-InstallMaintenanceSolution` is supplied.
+
+## Idempotency Model
+
+AzSQLVMKit aims to support idempotent, repeatable deployments. The goal is that rerunning the same configuration creates missing resources, reuses resources that already exist, and can continue after many partial failures.
+
+The toolkit is currently create-if-missing:
+
+- Existing resource groups are reused.
+- Existing Key Vaults are reused after authorization-mode checks.
+- Existing VM passwords are reused from Key Vault. Newly created toolkit passwords require `-GeneratePassword` and are generated in PowerShell, so use an approved external credential workflow for sensitive environments.
+- Existing VNets and subnets are reused or extended when the target subnet is missing.
+- Existing NSGs, NICs, VMs, Bastion hosts, storage accounts, and file shares are reused.
+- Local backup uploads always use a new timestamped Azure Files folder and refuse to overwrite existing uploaded backup files.
+- Selected sample database restores are skipped when the target database already exists.
+- First Responder Kit reruns update the installed stored procedures rather than creating duplicate objects.
+- Maintenance Solution reruns update stored procedures; if SQL Agent jobs are enabled, upstream installer behavior can replace existing Maintenance Solution jobs.
+
+The toolkit does not yet fully reconcile drift on existing resources. It warns about selected existing target NIC public IPs and broad RDP/SQL NSG rules, but it does not currently rewrite existing NSG rules, resize existing VMs, change existing images, change Bastion SKU, or change storage SKU.
+
+## Partial Failure Behavior
+
+If a deployment fails partway through, review the Azure resources that were created, fix the cause, and rerun with:
+
+```powershell
+New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -GeneratePassword -Plan
+New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -GeneratePassword -WhatIf
+New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -GeneratePassword
+```
+
+Because existing resources are reused, reruns are intended to continue from the last successful resource. Drift correction is limited, so inspect resources manually if a failure happened during a create/update step.
+
+## Long-Running Steps
+
+The command includes short waits after Key Vault permission changes to allow Azure RBAC propagation. VM creation and guest setup are the slowest parts of the deployment.

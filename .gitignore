@@ -1,0 +1,9 @@
+# Local test data and secrets
+config.local.yaml
+*.local.yaml
+*.local.md
+.env
+test-results/
+.vscode/
+.codex/
+AGENTS.md

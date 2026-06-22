@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title" viewBox="0 0 128 128">
+  <title id="title">AzureSqlVmToolkit favicon</title>
+  <defs>
+    <linearGradient id="pathGradient" x1="18" x2="111" y1="10" y2="118" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38bdf8" />
+      <stop offset=".48" stop-color="#2563eb" />
+      <stop offset="1" stop-color="#1d4ed8" />
+    </linearGradient>
+  </defs>
+
+  <path d="M64 8 112 36v56l-48 28-48-28V36L64 8Z" fill="#eff6ff" />
+  <path d="M64 8 112 36v56l-48 28-48-28V36L64 8Z" fill="url(#pathGradient)" opacity=".94" />
+  <path d="M64 22 99 43v42l-35 21-35-21V43l35-21Z" fill="#0f172a" opacity=".12" />
+
+  <path d="M30 44 64 25l34 19-34 19-34-19Z" fill="#bae6fd" opacity=".94" />
+  <path d="M30 64 64 45l34 19-34 19-34-19Z" fill="#60a5fa" opacity=".9" />
+  <path d="M30 84 64 65l34 19-34 19-34-19Z" fill="#1d4ed8" opacity=".88" />
+
+  <path d="M48 58 64 49l16 9v20l-16 9-16-9V58Z" fill="#eff6ff" />
+  <path d="M55 61h18v14c0 6-4 10-9 12-6-2-9-6-9-12V61Z" fill="#1e3a8a" opacity=".28" />
+  <path d="M59 60v-4c0-4 2-6 5-6s5 2 5 6v4" fill="none" stroke="#0f172a" stroke-width="4" stroke-linecap="round" opacity=".32" />
+
+</svg>

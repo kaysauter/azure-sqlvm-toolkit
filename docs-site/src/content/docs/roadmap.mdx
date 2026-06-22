@@ -1,0 +1,43 @@
+---
+title: Roadmap
+description: Where AzSQLVMKit is going next.
+---
+
+AzSQLVMKit is PowerShell-first today. The goal is to grow into a beginner-friendly toolkit that can explain and deploy the same environment through multiple paths.
+
+## Near Term
+
+- More Pester coverage for config validation and deployment planning
+- Better drift warnings for existing resources
+- Clearer local test and live smoke test commands
+- Stronger supply-chain guidance for guest setup packages
+- Published documentation site with examples and diagrams
+
+## Infrastructure As Code
+
+Future versions may add:
+
+- Bicep templates
+- Terraform configuration
+- shared naming and validation logic across deployment paths
+- consistent security assessment output for each deployment engine
+
+## Security Improvements
+
+Candidate improvements:
+
+- option to pin Chocolatey package versions
+- checksum guidance for downloaded installers
+- storage access alternatives that avoid broad storage account keys
+- richer checks for public network surfaces
+- clearer least-privilege role assignment documentation
+
+## Documentation
+
+The docs site now includes command, configuration, naming, deployment, resource, guest setup, architecture, testing, troubleshooting, and development references. Good next additions are:
+
+- architecture diagrams
+- sanitized screenshots for common workflows
+- worked examples for common scenarios
+- release notes
+- contribution guide

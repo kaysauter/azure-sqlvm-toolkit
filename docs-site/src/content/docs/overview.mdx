@@ -1,0 +1,125 @@
+---
+title: Overview
+description: Beginner-friendly Azure SQL Server VM deployments with Azure Bastion, Key Vault, Azure Files, and security-minded defaults.
+---
+
+AzureSqlVmToolkit is a PowerShell module for creating an Azure SQL Server VM development environment without asking beginners to hand-write every Azure resource name. In this documentation, we use **AzSQLVMKit** from this point on.
+
+:::danger[Heavy development warning]
+AzSQLVMKit is still evolving quickly and is not ready for production use yet. Use it only for demos, labs, and learning environments. Nightly snapshots may be published for visibility and testing, but they can be incomplete or non-functional and should not be treated as releases. Bug reports, security reports, and feature requests are very welcome.
+:::
+
+:::tip[Start with why]
+Read [Why using AzSQLVMKit](/azure-sqlvm-toolkit/why-using-azuresqlvmtoolkit/) for the short argument behind the toolkit, including target scenarios, tradeoffs, and current limits.
+:::
+
+:::tip[Project front page]
+Open the [AzSQLVMKit front page](/azure-sqlvm-toolkit/) for the public pitch page, including the link to the interactive pitch deck.
+:::
+
+![AzSQLVMKit logo: abstract secure deployment mark with layered blue paths and a protected center.](/azure-sqlvm-toolkit/toolkit-logo.svg)
+
+The toolkit is designed around four ideas:
+
+- security-minded defaults first
+- convention over configuration
+- clear preview output before anything is deployed
+- subscription-aware sizing and cost guidance before you spend money
+
+## How It Works
+
+![AzSQLVMKit deployment flow showing local config, module preview, Azure resource creation, Bastion access, Key Vault secrets, managed identity, and Azure Files mounting.](/azure-sqlvm-toolkit/toolkit-flow.svg?v=4)
+
+The toolkit starts from your ignored local YAML config, resolves safe defaults, and shows a `-Plan` before it creates anything. When you are ready, `-WhatIf` and the real deployment use the Azure PowerShell `Az` module to create or reuse Azure resources.
+
+The deployment flow aims to be idempotent: reruns should reuse existing resources and continue from already-created parts where possible. Current behavior is create-if-missing, with limited drift correction for resources that already exist.
+
+## What It Deploys
+
+- Resource groups for VM resources and storage resources
+- A VNet, subnet, NSG, and NIC
+- A SQL Server VM with system-assigned managed identity
+- Azure Bastion for RDP without a public IP on the VM
+- Key Vault for VM password and storage-key secret storage
+- Azure Files mounted inside the VM
+- Guest setup scripts for Chocolatey, PowerShell tools, dbatools, and a restore helper
+- Optional local SQL backup upload with a manual restore script
+- Optional allowlisted sample database downloads and restores
+- Optional Brent Ozar First Responder Kit install for SQL Server diagnostics
+- Optional Ola Hallengren Maintenance Solution install for SQL Server maintenance
+
+## Safer Lab Defaults
+
+The sample configuration:
+
+- does not assign a public IP to the VM
+- uses Azure Bastion as the intended entry point
+- requires Key Vault RBAC authorization
+- rejects legacy Key Vault access-policy mode
+- does not generate missing VM admin passwords unless `-GeneratePassword` is supplied
+- does not print VM passwords unless `-ShowPassword` is supplied
+
+## DevOps And GitOps Ready
+
+AzSQLVMKit is designed to fit source-controlled workflows:
+
+- keep shared defaults in `config.yaml`
+- keep environment-specific values in ignored `*.local.yaml` files
+- run `-Plan` in reviews to see generated names, resource intent, and security advice
+- run `-WhatIf` in connected environments before a real deployment
+- use repeatable PowerShell commands in local scripts or CI jobs
+- aim for idempotent reruns by creating missing resources and reusing existing ones
+
+The current implementation is PowerShell-first. The project roadmap keeps Bicep and Terraform in mind so future deployment engines can share the same beginner-friendly naming, preview, and security-assessment model.
+
+## Preview The Deployment Plan
+
+The plan is the first thing to look at after you have a config. It shows what the toolkit intends to create, which security advice applies, and which Azure resource names were resolved before any Azure API calls are made.
+
+```powershell
+New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -Plan
+```
+
+Most names are derived automatically from the `project` block, for example resource groups, VM name, network names, Key Vault name, storage account name, and file share name. The plan prints each name with its source:
+
+- `derived`: generated from the project settings
+- `explicit`: read from a legacy direct config value
+- `override`: enforced through `naming.overrides`
+
+Use the defaults when you want the simplest path. Use `naming.overrides` only when you need to enforce an existing name or a company naming standard:
+
+```yaml
+naming:
+  overrides:
+    resourceGroupName: "rg-my-existing-lab"
+    keyVaultName: "kv-my-existing-lab-42"
+    storageAccountName: "stmyexistinglab42"
+```
+
+That way beginners can start with a short config, while advanced users can still pin the names that matter.
+
+## Documentation Map
+
+Use the reference pages when you want to understand the project in detail:
+
+- Why using AzSQLVMKit: the problem, pitch, fit, and limits
+- AzSQLVMKit Front Page: public pitch page and pitch-deck entry point
+- Command Reference: exported PowerShell functions and parameters
+- Sizing And Costs: VM size discovery, SQL Server image discovery, and Markdown cost estimates
+- Licensing: SQL Server image, free edition, and Azure VM licensing reminders
+- Sample Databases: optional built-in samples and license reminders
+- SQL Community Tools: optional Brent Ozar and Ola Hallengren script installation
+- Azure Bastion: Bastion SKU choices, Microsoft reference links, and YAML examples
+- Hall of Fame: people and communities whose work the toolkit stands on
+- Third-party Notices: credits, source links, and license reminders for upstream samples, scripts, and tools
+- Configuration Reference: YAML fields, defaults, and safe examples
+- Generated Naming: naming rules, suffixes, and overrides
+- Deployment Flow: deployment order, idempotency, and partial-failure behavior
+- Resource Model: Azure resources, identities, secrets, and storage
+- Guest Setup: scripts that run inside the VM
+- Architecture: module layout and project structure
+- Development: local checks, docs workflow, and contribution guardrails
+
+## Current Status
+
+This project is beta software in heavy development and is not production ready yet. The goal for a release after the beta stage is to become production ready, with PowerShell first and later Bicep and Terraform deployment paths sharing the same security guidance. Bug reports, security reports, and feature requests are welcome.

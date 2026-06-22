@@ -1,0 +1,188 @@
+---
+title: SQL Community Tools
+description: Optional community SQL Server scripts that AzSQLVMKit can install.
+---
+
+AzSQLVMKit can optionally install Brent Ozar's First Responder Kit during deployment.
+
+AzSQLVMKit can also optionally install Ola Hallengren's SQL Server Maintenance Solution.
+
+These features are opt-in. The toolkit does not install diagnostic or maintenance community scripts unless you pass the matching flag.
+
+Credit belongs to the upstream authors and maintainers. See [Third-party Notices](/azure-sqlvm-toolkit/third-party-notices/) for the complete attribution list, source links, and license reminders, including dbatools, Chocolatey, Brent Ozar Unlimited, Ola Hallengren, and related contributors.
+
+## Brent Ozar First Responder Kit
+
+The First Responder Kit includes diagnostic stored procedures such as:
+
+- `sp_Blitz`
+- `sp_BlitzCache`
+- `sp_BlitzFirst`
+- `sp_BlitzIndex`
+- `sp_BlitzWho`
+- `sp_BlitzBackups`
+- `sp_BlitzLock`
+- `sp_DatabaseRestore`
+
+Credit belongs to [Brent Ozar Unlimited](https://www.brentozar.com/) and the First Responder Kit contributors. Review the upstream project, license, and support expectations before enabling installation.
+
+Source:
+
+- [BrentOzarULTD/SQL-Server-First-Responder-Kit](https://github.com/BrentOzarULTD/SQL-Server-First-Responder-Kit)
+- [dbatools Install-DbaFirstResponderKit](https://dbatools.io/Install-DbaFirstResponderKit/)
+
+## Preview Installation
+
+```powershell
+New-AzureSqlVmToolkitDeployment `
+  -ConfigFile .\config.local.yaml `
+  -SecurityAssessmentAdvice `
+  -GeneratePassword `
+  -Plan `
+  -InstallFirstResponderKit
+```
+
+## Install During Deployment
+
+```powershell
+New-AzureSqlVmToolkitDeployment `
+  -ConfigFile .\config.local.yaml `
+  -SecurityAssessmentAdvice `
+  -GeneratePassword `
+  -InstallFirstResponderKit
+```
+
+The toolkit installs into `master` by default. To use another utility database:
+
+```powershell
+New-AzureSqlVmToolkitDeployment `
+  -ConfigFile .\config.local.yaml `
+  -SecurityAssessmentAdvice `
+  -GeneratePassword `
+  -InstallFirstResponderKit `
+  -FirstResponderKitDatabase DBA
+```
+
+Aliases are available if you think about this feature as Brent Ozar's scripts:
+
+- `-InstallBrentOzarScripts`
+- `-InstallBrentOzarFirstResponderKit`
+
+## Runtime Behavior
+
+The guest script:
+
+- imports `dbatools`
+- calls `Install-DbaFirstResponderKit`
+- runs the upstream `Install-All-Scripts.sql`
+- installs or updates the stored procedures in the target database
+- checks that expected procedures were created
+
+The default guest setup installs `dbatools`. If you replace `softwareInstalls.installScript`, make sure your custom script still installs dbatools before enabling this feature.
+
+The install is repeatable: reruns update the procedures to the downloaded version rather than creating duplicate objects.
+
+## Security Notes
+
+This feature downloads and runs upstream SQL scripts inside the SQL Server instance. That is useful for labs and demos, but it is still external code execution.
+
+Before enabling it, review:
+
+- source repository
+- license and attribution
+- upstream release notes
+- support expectations
+- whether installing diagnostic procedures in `master` is acceptable for your environment
+
+For production-grade repeatability, mirror or pin an approved copy of the scripts instead of relying on a live download at deployment time.
+
+## Ola Hallengren Maintenance Solution
+
+Ola Hallengren's SQL Server Maintenance Solution includes stored procedures for:
+
+- database backups
+- integrity checks
+- index and statistics maintenance
+- command logging and execution support
+
+Credit belongs to [Ola Hallengren](https://ola.hallengren.com/) and the SQL Server Maintenance Solution contributors. Review the upstream project, license, jobs, schedules, and support expectations before enabling installation.
+
+Sources:
+
+- [Ola Hallengren SQL Server Maintenance Solution](https://ola.hallengren.com/)
+- [olahallengren/sql-server-maintenance-solution](https://github.com/olahallengren/sql-server-maintenance-solution)
+- [dbatools Install-DbaMaintenanceSolution](https://dbatools.io/Install-DbaMaintenanceSolution/)
+
+### Preview Installation
+
+```powershell
+New-AzureSqlVmToolkitDeployment `
+  -ConfigFile .\config.local.yaml `
+  -SecurityAssessmentAdvice `
+  -GeneratePassword `
+  -Plan `
+  -InstallMaintenanceSolution
+```
+
+### Install Procedures
+
+```powershell
+New-AzureSqlVmToolkitDeployment `
+  -ConfigFile .\config.local.yaml `
+  -SecurityAssessmentAdvice `
+  -GeneratePassword `
+  -InstallMaintenanceSolution
+```
+
+The toolkit installs into `master` by default. To use another utility database:
+
+```powershell
+New-AzureSqlVmToolkitDeployment `
+  -ConfigFile .\config.local.yaml `
+  -SecurityAssessmentAdvice `
+  -GeneratePassword `
+  -InstallMaintenanceSolution `
+  -MaintenanceSolutionDatabase DBA
+```
+
+### Optional SQL Agent Jobs
+
+SQL Agent jobs are not installed by default. This is deliberate because backup jobs can consume significant storage.
+
+To install jobs:
+
+```powershell
+New-AzureSqlVmToolkitDeployment `
+  -ConfigFile .\config.local.yaml `
+  -SecurityAssessmentAdvice `
+  -GeneratePassword `
+  -InstallMaintenanceSolution `
+  -InstallMaintenanceSolutionJobs `
+  -MaintenanceSolutionBackupLocation "Z:\SqlBackups" `
+  -MaintenanceSolutionCleanupTime 168
+```
+
+Before enabling jobs, review:
+
+- backup target and free space
+- cleanup retention
+- SQL Agent schedules
+- whether backups should go to VM disk, Azure Files, or another approved share
+- impact on demo/lab cost and runtime
+
+Aliases:
+
+- `-InstallOlaHallengrenScripts`
+- `-InstallOlaMaintenanceSolution`
+
+### Runtime Behavior
+
+The guest script:
+
+- imports `dbatools`
+- calls `Install-DbaMaintenanceSolution`
+- installs or updates the Maintenance Solution stored procedures
+- optionally installs SQL Agent jobs
+- verifies that expected procedures were created
+
+The install uses `-ReplaceExisting` so reruns update the procedures. If jobs are installed, existing Maintenance Solution jobs may be replaced by the upstream installer behavior.

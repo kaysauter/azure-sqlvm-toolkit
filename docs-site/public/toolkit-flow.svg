@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" role="img" aria-labelledby="title desc" viewBox="0 0 1180 720">
+  <title id="title">AzureSqlVmToolkit deployment flow</title>
+  <desc id="desc">A visual overview showing local configuration flowing into the PowerShell toolkit, safe plan and WhatIf previews, Azure resource deployment, Bastion access, Key Vault secrets, managed identity, and Azure Files mounting.</desc>
+  <defs>
+    <style>
+      :root {
+        color-scheme: light dark;
+      }
+      .canvas { fill: #f8fafc; }
+      .panel { fill: #ffffff; stroke: #cbd5e1; stroke-width: 2; }
+      .panel-soft { fill: #f1f5f9; stroke: #cbd5e1; stroke-width: 2; }
+      .text { fill: #0f172a; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+      .muted { fill: #475569; }
+      .line { fill: none; stroke: #1d4ed8; stroke-width: 2.75; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow); }
+      .line-soft { fill: none; stroke: #0f766e; stroke-width: 2.5; stroke-linecap: round; stroke-linejoin: round; marker-end: url(#arrow-soft); stroke-dasharray: 10 8; }
+      .arrow-head { fill: #1d4ed8; }
+      .arrow-soft-head { fill: #0f766e; }
+      .badge-blue { fill: #dbeafe; stroke: #2563eb; }
+      .badge-green { fill: #dcfce7; stroke: #16a34a; }
+      .badge-amber { fill: #fef3c7; stroke: #d97706; }
+      .badge-rose { fill: #ffe4e6; stroke: #e11d48; }
+      .badge-violet { fill: #ede9fe; stroke: #7c3aed; }
+      .badge-cyan { fill: #cffafe; stroke: #0891b2; }
+      .chip { stroke-width: 2; }
+      .small { font-size: 18px; }
+      .body { font-size: 21px; }
+      .title { font-size: 28px; font-weight: 700; }
+      .section { font-size: 22px; font-weight: 700; }
+      .mono { font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace; font-size: 18px; }
+      @media (prefers-color-scheme: dark) {
+        .canvas { fill: #020617; }
+        .panel { fill: #0f172a; stroke: #334155; }
+        .panel-soft { fill: #111827; stroke: #334155; }
+        .text { fill: #e5e7eb; }
+        .muted { fill: #cbd5e1; }
+        .line { stroke: #93c5fd; }
+        .line-soft { stroke: #67e8f9; }
+        .arrow-head { fill: #93c5fd; }
+        .arrow-soft-head { fill: #67e8f9; }
+        .badge-blue { fill: #172554; stroke: #60a5fa; }
+        .badge-green { fill: #14532d; stroke: #4ade80; }
+        .badge-amber { fill: #451a03; stroke: #fbbf24; }
+        .badge-rose { fill: #4c0519; stroke: #fb7185; }
+        .badge-violet { fill: #2e1065; stroke: #a78bfa; }
+        .badge-cyan { fill: #164e63; stroke: #22d3ee; }
+      }
+    </style>
+    <marker id="arrow" markerUnits="userSpaceOnUse" markerWidth="22" markerHeight="22" refX="20" refY="11" orient="auto" viewBox="0 0 22 22">
+      <path class="arrow-head" d="M3,4 L20,11 L3,18 Z" />
+    </marker>
+    <marker id="arrow-soft" markerUnits="userSpaceOnUse" markerWidth="18" markerHeight="18" refX="16" refY="9" orient="auto" viewBox="0 0 18 18">
+      <path class="arrow-soft-head" d="M3,4 L16,9 L3,14 Z" />
+    </marker>
+  </defs>
+
+  <rect class="canvas" width="1180" height="720" rx="24" />
+
+  <text class="text title" x="50" y="58">How AzureSqlVmToolkit Works</text>
+  <text class="text muted body" x="50" y="91">Start local, preview safely, then create Azure resources with secure defaults.</text>
+
+  <rect class="panel" x="50" y="130" width="300" height="210" rx="18" />
+  <text class="text section" x="78" y="168">Local workspace</text>
+  <rect class="chip badge-blue" x="78" y="194" width="236" height="48" rx="12" />
+  <text class="text mono" x="96" y="225">config.local.yaml</text>
+  <rect class="chip badge-violet" x="78" y="260" width="236" height="48" rx="12" />
+  <text class="text mono" x="96" y="291">Import-Module</text>
+
+  <rect class="panel" x="440" y="118" width="300" height="235" rx="18" />
+  <text class="text section" x="468" y="156">Toolkit module</text>
+  <text class="text muted small" x="468" y="190">Resolve names</text>
+  <text class="text muted small" x="468" y="220">Validate config</text>
+  <text class="text muted small" x="468" y="250">Assess security</text>
+  <text class="text muted small" x="468" y="280">Use Az cmdlets</text>
+  <rect class="chip badge-green" x="468" y="303" width="112" height="34" rx="10" />
+  <text class="text small" x="492" y="326">-Plan</text>
+  <rect class="chip badge-amber" x="594" y="303" width="112" height="34" rx="10" />
+  <text class="text small" x="614" y="326">-WhatIf</text>
+
+  <rect class="panel-soft" x="830" y="120" width="300" height="230" rx="18" />
+  <text class="text section" x="858" y="158">Azure resources</text>
+  <rect class="chip badge-cyan" x="858" y="184" width="220" height="38" rx="10" />
+  <text class="text small" x="877" y="209">Resource groups</text>
+  <rect class="chip badge-blue" x="858" y="232" width="220" height="38" rx="10" />
+  <text class="text small" x="877" y="257">VNet, NSG, NIC</text>
+  <rect class="chip badge-violet" x="858" y="280" width="220" height="38" rx="10" />
+  <text class="text small" x="877" y="305">SQL Server VM</text>
+
+  <rect class="panel" x="72" y="445" width="250" height="145" rx="18" />
+  <text class="text section" x="100" y="483">Operator</text>
+  <text class="text muted small" x="100" y="518">Connect through</text>
+  <text class="text muted small" x="100" y="548">Azure Bastion</text>
+
+  <rect class="panel" x="405" y="430" width="230" height="165" rx="18" />
+  <text class="text section" x="433" y="468">Key Vault</text>
+  <text class="text muted small" x="433" y="503">VM password</text>
+  <text class="text muted small" x="433" y="533">Storage key secret</text>
+  <text class="text muted small" x="433" y="563">RBAC by default</text>
+
+  <rect class="panel" x="715" y="430" width="190" height="165" rx="18" />
+  <text class="text section" x="743" y="468">Azure Files</text>
+  <text class="text muted small" x="743" y="503">Mounted in VM</text>
+  <text class="text muted small" x="743" y="533">Backups share</text>
+  <text class="text muted small" x="743" y="563">Restore script</text>
+
+  <rect class="panel" x="960" y="430" width="170" height="165" rx="18" />
+  <text class="text section" x="988" y="468">Guest setup</text>
+  <text class="text muted small" x="988" y="503">Install tools</text>
+  <text class="text muted small" x="988" y="533">Mount share</text>
+  <text class="text muted small" x="988" y="563">Run restore</text>
+
+  <path class="line" d="M350 235 H430" />
+  <path class="line" d="M740 235 H820" />
+  <path class="line-soft" d="M590 353 C590 390 520 392 520 422" />
+  <path class="line" d="M980 350 C980 382 1038 388 1045 422" />
+  <path class="line" d="M960 350 C960 395 820 388 810 422" />
+  <path class="line" d="M950 350 C950 404 565 383 532 422" />
+  <path class="line" d="M322 518 H395" />
+  <path class="line-soft" d="M905 512 H950" />
+  <path class="line-soft" d="M635 512 H705" />
+
+  <rect class="chip badge-green" x="424" y="625" width="215" height="36" rx="10" />
+  <text class="text small" x="444" y="649">safe preview first</text>
+  <rect class="chip badge-rose" x="796" y="625" width="260" height="36" rx="10" />
+  <text class="text small" x="818" y="649">creates only after review</text>
+</svg>
