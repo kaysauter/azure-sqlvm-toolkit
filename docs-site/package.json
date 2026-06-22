@@ -7,7 +7,7 @@
     "start": "astro dev",
     "build": "npm run build:astro && npm run build:slides",
     "build:astro": "astro build",
-    "build:slides": "slidev build pitch.md --base /azure-sqlvm-toolkit/pitch/deck/ --out dist/pitch/deck --without-notes",
+    "build:slides": "slidev build pitch.md --base /azure-sqlvm-toolkit/pitch/deck/ --out dist/pitch/deck --without-notes --router-mode hash",
     "preview": "node scripts/preview-docs.mjs",
     "preview:astro": "astro preview",
     "slides": "slidev pitch.md",
