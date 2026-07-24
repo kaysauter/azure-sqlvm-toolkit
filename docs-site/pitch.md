@@ -85,6 +85,30 @@ download: false
 .muted {
 	color: #cbd5e1;
 }
+
+.deck-hint {
+	position: absolute;
+	right: 2rem;
+	bottom: 1.4rem;
+	color: #cbd5e1;
+	font-size: 0.82rem;
+	letter-spacing: 0;
+	opacity: 0.78;
+}
+
+.agenda-list {
+	display: grid;
+	gap: 0.75rem;
+	margin-top: 1.5rem;
+}
+
+.agenda-list li {
+	background: rgba(15, 23, 42, 0.62);
+	border: 1px solid rgba(148, 163, 184, 0.24);
+	border-radius: 8px;
+	list-style: none;
+	padding: 0.72rem 0.95rem;
+}
 </style>
 
 <div class="eyebrow">Azure SQL Server VM labs, with fewer sharp edges</div>
@@ -99,6 +123,21 @@ In this deck, we use **AzSQLVMKit** from this point on.
 	<img :src="'./toolkit-logo.svg'" alt="AzureSqlVmToolkit logo" class="h-32 w-32" />
 	<div class="text-2xl muted">A PowerShell-first toolkit for demos, labs, and teaching Azure SQL Server VM concepts.</div>
 </div>
+
+<div class="deck-hint">Press G for slide list. Use arrow keys to navigate.</div>
+
+---
+
+<div class="eyebrow">Agenda</div>
+
+# What this deck covers
+
+<ul class="agenda-list">
+	<li>Why Azure SQL VM labs are easy to misconfigure</li>
+	<li>How the toolkit keeps planning, security, and deployment visible</li>
+	<li>What gets deployed in the current lab shape</li>
+	<li>How restore, cost, licensing, and production-readiness tradeoffs are handled</li>
+</ul>
 
 ---
 

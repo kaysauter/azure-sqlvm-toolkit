@@ -4,6 +4,11 @@ import { fileURLToPath } from 'node:url';
 
 const deckBase = '/azure-sqlvm-toolkit/pitch/deck/';
 const assetsRoot = resolve(fileURLToPath(new URL('../dist/pitch/deck/assets', import.meta.url)));
+const indexHtmlPath = resolve(fileURLToPath(new URL('../dist/pitch/deck/index.html', import.meta.url)));
+const gotoDialogStyleId = 'slidev-goto-dialog-fix';
+const gotoDialogStyle = `<style id="${gotoDialogStyleId}">
+#slidev-goto-dialog[class*="-top-20"]{display:none!important}
+</style>`;
 
 const routeHelperPattern = new RegExp(
 	`return\`${deckBase.replaceAll('/', '\\/')}` +
@@ -18,11 +23,11 @@ const patchedRouteHelperPattern = new RegExp(
 	'g',
 );
 const historyBasePattern = new RegExp(
-	`history:([A-Za-z_$][\\w$]*)\\("${deckBase.replaceAll('/', '\\/')}"\\)`,
+	`history:([A-Za-z_$][\\w$]*)\\((["'\`])${deckBase.replaceAll('/', '\\/')}\\2\\)`,
 	'g',
 );
 const patchedHistoryBasePattern = new RegExp(
-	`history:([A-Za-z_$][\\w$]*)\\("${deckBase.replaceAll('/', '\\/')}#"\\)`,
+	`history:([A-Za-z_$][\\w$]*)\\((["'\`])${deckBase.replaceAll('/', '\\/')}#\\2\\)`,
 	'g',
 );
 
@@ -45,25 +50,47 @@ const findJavaScriptFiles = (directory) => {
 	return files;
 };
 
+const ensureGotoDialogStyle = () => {
+	if (!existsSync(indexHtmlPath)) {
+		console.error(`Slidev index.html was not found: ${indexHtmlPath}`);
+		process.exit(1);
+	}
+
+	const source = readFileSync(indexHtmlPath, 'utf8');
+	if (source.includes(`id="${gotoDialogStyleId}"`)) {
+		return false;
+	}
+
+	if (!source.includes('</head>')) {
+		console.error('Could not find </head> in Slidev index.html.');
+		process.exit(1);
+	}
+
+	writeFileSync(indexHtmlPath, source.replace('</head>', `${gotoDialogStyle}\n</head>`));
+	return true;
+};
+
 if (!existsSync(assetsRoot)) {
 	console.error(`Slidev assets directory was not found: ${assetsRoot}`);
 	process.exit(1);
 }
 
-let replacements = 0;
-let alreadyPatched = 0;
+let routeReplacements = 0;
+let historyReplacements = 0;
+let routeAlreadyPatched = 0;
+let historyAlreadyPatched = 0;
 
 for (const file of findJavaScriptFiles(assetsRoot)) {
 	const source = readFileSync(file, 'utf8');
-	alreadyPatched += source.match(patchedRouteHelperPattern)?.length || 0;
-	alreadyPatched += source.match(patchedHistoryBasePattern)?.length || 0;
+	routeAlreadyPatched += source.match(patchedRouteHelperPattern)?.length || 0;
+	historyAlreadyPatched += source.match(patchedHistoryBasePattern)?.length || 0;
 	let patched = source.replace(routeHelperPattern, (_match, exportFlag, routeValue, presenterFlag) => {
-		replacements += 1;
+		routeReplacements += 1;
 		return `return\`/\${${exportFlag}?\`export/\${${routeValue}}\`:${presenterFlag}?\`presenter/\${${routeValue}}\`:\`\${${routeValue}}\`}\``;
 	});
 	patched = patched.replace(historyBasePattern, (_match, historyHelper) => {
-		replacements += 1;
-		return `history:${historyHelper}("${deckBase}#")`;
+		historyReplacements += 1;
+		return `history:${historyHelper}(\`${deckBase}#\`)`;
 	});
 
 	if (patched !== source) {
@@ -71,20 +98,33 @@ for (const file of findJavaScriptFiles(assetsRoot)) {
 	}
 }
 
-if (replacements === 1) {
-	console.log('Patched Slidev routing to use hash-safe GitHub Pages paths.');
-	process.exit(0);
-}
+const routePatchOk = routeReplacements === 1 || (routeReplacements === 0 && routeAlreadyPatched === 1);
+const historyPatchOk = historyReplacements === 1 || (historyReplacements === 0 && historyAlreadyPatched === 1);
 
-if (replacements === 0 && alreadyPatched === 1) {
-	console.log('Slidev routing already uses hash-safe GitHub Pages paths.');
-	process.exit(0);
-}
-
-if (replacements === 0) {
-	console.error('Could not find the Slidev route helper to patch.');
+if (!routePatchOk) {
+	console.error(
+		`Expected to patch or find exactly one Slidev route helper, but patched ${routeReplacements} and found ${routeAlreadyPatched} already patched.`,
+	);
 	process.exit(1);
 }
 
-console.error(`Expected to patch exactly one Slidev route helper, but patched ${replacements}.`);
-process.exit(1);
+if (!historyPatchOk) {
+	console.error(
+		`Expected to patch or find exactly one Slidev history base, but patched ${historyReplacements} and found ${historyAlreadyPatched} already patched.`,
+	);
+	process.exit(1);
+}
+
+const patchedGotoDialog = ensureGotoDialogStyle();
+
+console.log(
+	routeReplacements === 1 || historyReplacements === 1
+		? 'Patched Slidev routing to use hash-safe GitHub Pages paths.'
+		: 'Slidev routing already uses hash-safe GitHub Pages paths.',
+);
+console.log(
+	patchedGotoDialog
+		? 'Patched Slidev goto dialog closed-state visibility.'
+		: 'Slidev goto dialog visibility patch already present.',
+);
+process.exit(0);
