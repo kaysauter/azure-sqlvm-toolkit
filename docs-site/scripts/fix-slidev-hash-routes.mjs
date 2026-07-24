@@ -4,6 +4,11 @@ import { fileURLToPath } from 'node:url';
 
 const deckBase = '/azure-sqlvm-toolkit/pitch/deck/';
 const assetsRoot = resolve(fileURLToPath(new URL('../dist/pitch/deck/assets', import.meta.url)));
+const indexHtmlPath = resolve(fileURLToPath(new URL('../dist/pitch/deck/index.html', import.meta.url)));
+const gotoDialogStyleId = 'slidev-goto-dialog-fix';
+const gotoDialogStyle = `<style id="${gotoDialogStyleId}">
+#slidev-goto-dialog[class*="-top-20"]{display:none!important}
+</style>`;
 
 const routeHelperPattern = new RegExp(
 	`return\`${deckBase.replaceAll('/', '\\/')}` +
@@ -45,6 +50,26 @@ const findJavaScriptFiles = (directory) => {
 	return files;
 };
 
+const ensureGotoDialogStyle = () => {
+	if (!existsSync(indexHtmlPath)) {
+		console.error(`Slidev index.html was not found: ${indexHtmlPath}`);
+		process.exit(1);
+	}
+
+	const source = readFileSync(indexHtmlPath, 'utf8');
+	if (source.includes(`id="${gotoDialogStyleId}"`)) {
+		return false;
+	}
+
+	if (!source.includes('</head>')) {
+		console.error('Could not find </head> in Slidev index.html.');
+		process.exit(1);
+	}
+
+	writeFileSync(indexHtmlPath, source.replace('</head>', `${gotoDialogStyle}\n</head>`));
+	return true;
+};
+
 if (!existsSync(assetsRoot)) {
 	console.error(`Slidev assets directory was not found: ${assetsRoot}`);
 	process.exit(1);
@@ -71,20 +96,32 @@ for (const file of findJavaScriptFiles(assetsRoot)) {
 	}
 }
 
-if (replacements === 1) {
-	console.log('Patched Slidev routing to use hash-safe GitHub Pages paths.');
-	process.exit(0);
-}
+if (replacements !== 1 && !(replacements === 0 && alreadyPatched === 1)) {
+	if (replacements === 0) {
+		console.error('Could not find the Slidev route helper to patch.');
+		process.exit(1);
+	}
 
-if (replacements === 0 && alreadyPatched === 1) {
-	console.log('Slidev routing already uses hash-safe GitHub Pages paths.');
-	process.exit(0);
-}
-
-if (replacements === 0) {
-	console.error('Could not find the Slidev route helper to patch.');
+	console.error(`Expected to patch exactly one Slidev route helper, but patched ${replacements}.`);
 	process.exit(1);
 }
 
-console.error(`Expected to patch exactly one Slidev route helper, but patched ${replacements}.`);
-process.exit(1);
+const patchedGotoDialog = ensureGotoDialogStyle();
+
+if (replacements === 1) {
+	console.log('Patched Slidev routing to use hash-safe GitHub Pages paths.');
+	console.log(
+		patchedGotoDialog
+			? 'Patched Slidev goto dialog closed-state visibility.'
+			: 'Slidev goto dialog visibility patch already present.',
+	);
+	process.exit(0);
+}
+
+console.log('Slidev routing already uses hash-safe GitHub Pages paths.');
+console.log(
+	patchedGotoDialog
+		? 'Patched Slidev goto dialog closed-state visibility.'
+		: 'Slidev goto dialog visibility patch already present.',
+);
+process.exit(0);
