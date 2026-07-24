@@ -5,6 +5,8 @@
 
 **Website and documentation:** <https://kaysauter.github.io/azure-sqlvm-toolkit/>
 
+> **Project direction:** Azure SQLVM Toolkit remains the current implementation focused on Azure SQL VM. A broader successor, **Azure Data Lab Toolkit**, is being started with Azure SQL VM as its first target. It is planned to expand later to Azure SQL Database, Azure SQL Managed Instance, Microsoft Fabric, PostgreSQL, storage, Git and CI/CD integrations, and PowerShell, Bicep, and Terraform deployment engines. This successor functionality has not shipped yet.
+
 > **Heavy development warning:** AzureSqlVmToolkit is still evolving quickly and is not ready for production use yet. Use it only for demos, labs, and learning environments. Nightly snapshots may be published for visibility and testing, but they can be incomplete or non-functional and should not be treated as releases. Bug reports, security reports, and feature requests are welcome.
 
 AzureSqlVmToolkit ships as a PowerShell module plus YAML config for creating an Azure SQL Server VM lab environment. The original root script remains available as a compatibility entry point.
