@@ -30,8 +30,8 @@
 
 .source-footer {
 	position: fixed;
-	bottom: 0.7rem;
-	right: 1.1rem;
+	top: 1rem;
+	left: 1rem;
 	z-index: 100;
 	border: 1px solid rgba(125, 211, 252, 0.30);
 	border-radius: 999px;
@@ -55,7 +55,8 @@
 }
 
 @media print {
-	.front-page-link {
+	.front-page-link,
+	.source-footer {
 		display: none;
 	}
 }
