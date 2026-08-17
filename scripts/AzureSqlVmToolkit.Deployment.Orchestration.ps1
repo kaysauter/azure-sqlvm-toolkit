@@ -20,20 +20,26 @@ function Invoke-AzureSqlVmToolkitDeployment {
         [switch]$SecurityAssessmentAdvice,
 
         [Parameter(Mandatory = $false)]
-        [switch]$Plan
+        [switch]$Plan,
+
+        [Parameter(Mandatory = $false)]
+        [hashtable]$DiagnosticContext = @{}
     )
 
     $stopwatch = [System.Diagnostics.Stopwatch]::StartNew()
+    Set-ToolkitDiagnosticContext -Context $DiagnosticContext -Phase "Configuration"
     $deployment = Get-ToolkitDeploymentContext -ConfigFile $ConfigFile
     $config = $deployment.Config
     $names = $deployment.ResourceNames
     $location = $config.resourceGroup.location
 
     if ($SecurityAssessmentAdvice -or $Plan -or $WhatIfPreference) {
+        Set-ToolkitDiagnosticContext -Context $DiagnosticContext -Phase "Security assessment advice"
         Write-ToolkitSecurityAdvice -Config $config -VmPublicIpEnabled $deployment.VmPublicIpEnabled -GeneratePasswordEnabled $GeneratePassword.IsPresent -ShowPasswordEnabled $ShowPassword.IsPresent
     }
 
     if ($Plan) {
+        Set-ToolkitDiagnosticContext -Context $DiagnosticContext -Phase "Plan"
         Write-ToolkitPlan `
             -Config $config `
             -VmPublicIpEnabled $deployment.VmPublicIpEnabled `
@@ -51,20 +57,24 @@ function Invoke-AzureSqlVmToolkitDeployment {
         return
     }
 
+    Set-ToolkitDiagnosticContext -Context $DiagnosticContext -Phase "Azure context"
     $currentContext = Get-ToolkitAzureContext
     Write-ToolkitSuccess -Message "Using subscription: $($currentContext.Subscription.Name)"
     $subscriptionId = $currentContext.Subscription.Id
 
+    Set-ToolkitDiagnosticContext -Context $DiagnosticContext -Phase "Workload resource group" -ResourceType "Microsoft.Resources/resourceGroups" -ResourceName $names.ResourceGroupName
     $resourceGroupStep = Ensure-ToolkitResourceGroup -Name $names.ResourceGroupName -Location $location -Tag $config.resourceGroup.tags -WhatIf:$WhatIfPreference
     if (Test-ToolkitStepSkipped -Step $resourceGroupStep -Message "Stopping deployment because the workload resource group step was skipped.") {
         return
     }
 
+    Set-ToolkitDiagnosticContext -Context $DiagnosticContext -Phase "Storage resource group" -ResourceType "Microsoft.Resources/resourceGroups" -ResourceName $names.StorageResourceGroupName
     $storageResourceGroupStep = Ensure-ToolkitResourceGroup -Name $names.StorageResourceGroupName -Location $location -Tag $config.resourceGroup.tags -WhatIf:$WhatIfPreference
     if (Test-ToolkitStepSkipped -Step $storageResourceGroupStep -Message "Stopping deployment because the storage resource group step was skipped.") {
         return
     }
 
+    Set-ToolkitDiagnosticContext -Context $DiagnosticContext -Phase "Key Vault" -ResourceType "Microsoft.KeyVault/vaults" -ResourceName $names.KeyVaultName
     $keyVaultResult = Ensure-ToolkitKeyVault `
         -Name $names.KeyVaultName `
         -ResourceGroupName $names.StorageResourceGroupName `
@@ -76,13 +86,16 @@ function Invoke-AzureSqlVmToolkitDeployment {
     }
     $effectiveKeyVaultName = $keyVaultResult.VaultName
 
+    Set-ToolkitDiagnosticContext -Context $DiagnosticContext -Phase "Current principal"
     $currentUserId = Get-ToolkitCurrentPrincipalId -Context $currentContext
+    Set-ToolkitDiagnosticContext -Context $DiagnosticContext -Phase "Key Vault administrator role" -ResourceType "Microsoft.Authorization/roleAssignments" -ResourceName "Key Vault Secrets Officer"
     Ensure-ToolkitRoleAssignment -ObjectId $currentUserId -RoleDefinitionName "Key Vault Secrets Officer" -Scope $keyVaultResult.Resource.ResourceId -WhatIf:$WhatIfPreference | Out-Null
     if (-not $WhatIfPreference) {
         Write-ToolkitInfo -Message "Waiting 30 seconds for Key Vault RBAC propagation."
         Start-Sleep -Seconds 30
     }
 
+    Set-ToolkitDiagnosticContext -Context $DiagnosticContext -Phase "VM administrator secret" -ResourceType "Microsoft.KeyVault/vaults/secrets" -ResourceName $config.keyVault.vmAdminPasswordSecretName
     $passwordResult = Ensure-ToolkitVmAdminPasswordSecret `
         -VaultName $effectiveKeyVaultName `
         -SecretName $config.keyVault.vmAdminPasswordSecretName `
@@ -90,6 +103,7 @@ function Invoke-AzureSqlVmToolkitDeployment {
         -GeneratePassword:$GeneratePassword `
         -WhatIf:$WhatIfPreference
 
+    Set-ToolkitDiagnosticContext -Context $DiagnosticContext -Phase "Virtual network" -ResourceType "Microsoft.Network/virtualNetworks" -ResourceName $names.VnetName
     $vnetResult = Ensure-ToolkitVirtualNetwork -Config $config -Names $names -Location $location -SubscriptionId $subscriptionId -WhatIf:$WhatIfPreference
     if (Test-ToolkitStepSkipped -Step $vnetResult.Step -Message "Stopping deployment because the virtual network step was skipped.") {
         return
@@ -97,6 +111,7 @@ function Invoke-AzureSqlVmToolkitDeployment {
 
     $publicIpId = $null
     if ($deployment.VmPublicIpEnabled) {
+        Set-ToolkitDiagnosticContext -Context $DiagnosticContext -Phase "VM public IP" -ResourceType "Microsoft.Network/publicIPAddresses" -ResourceName $names.PipName
         $publicIpStep = Ensure-ToolkitPublicIpAddress `
             -Name $names.PipName `
             -ResourceGroupName $names.ResourceGroupName `
@@ -116,12 +131,14 @@ function Invoke-AzureSqlVmToolkitDeployment {
         }
     }
 
+    Set-ToolkitDiagnosticContext -Context $DiagnosticContext -Phase "Network security group" -ResourceType "Microsoft.Network/networkSecurityGroups" -ResourceName $names.NsgName
     $nsgStep = Ensure-ToolkitNetworkSecurityGroup -Config $config -Names $names -Location $location -SubscriptionId $subscriptionId -WhatIf:$WhatIfPreference
     if (Test-ToolkitStepSkipped -Step $nsgStep -Message "Stopping deployment because the network security group step was skipped.") {
         return
     }
     $nsgId = if ($nsgStep.Detail.Resource) { $nsgStep.Detail.Resource.Id } else { $nsgStep.ResourceId }
 
+    Set-ToolkitDiagnosticContext -Context $DiagnosticContext -Phase "Network interface" -ResourceType "Microsoft.Network/networkInterfaces" -ResourceName $names.InterfaceName
     $nicStep = Ensure-ToolkitNetworkInterface `
         -Names $names `
         -Location $location `
@@ -135,6 +152,7 @@ function Invoke-AzureSqlVmToolkitDeployment {
     }
     $nicId = if ($nicStep.Detail.Resource) { $nicStep.Detail.Resource.Id } else { $nicStep.ResourceId }
 
+    Set-ToolkitDiagnosticContext -Context $DiagnosticContext -Phase "Virtual machine" -ResourceType "Microsoft.Compute/virtualMachines" -ResourceName $names.VMName
     $vmStep = Ensure-ToolkitVirtualMachine `
         -Config $config `
         -Names $names `
@@ -148,17 +166,20 @@ function Invoke-AzureSqlVmToolkitDeployment {
     }
     $vm = if ($vmStep.Detail.Resource) { $vmStep.Detail.Resource } else { [pscustomobject]@{ Id = $vmStep.ResourceId; Identity = $null } }
 
+    Set-ToolkitDiagnosticContext -Context $DiagnosticContext -Phase "VM managed identity" -ResourceType "Microsoft.Compute/virtualMachines" -ResourceName $names.VMName
     $identityStep = Ensure-ToolkitVmManagedIdentity -ResourceGroupName $names.ResourceGroupName -VMName $names.VMName -VirtualMachine $vm -WhatIf:$WhatIfPreference
     if (Test-ToolkitStepSkipped -Step $identityStep -Message "Stopping deployment because the VM managed identity step was skipped.") {
         return
     }
     $vmIdentity = $identityStep.Detail.PrincipalId
 
+    Set-ToolkitDiagnosticContext -Context $DiagnosticContext -Phase "Azure Bastion" -ResourceType "Microsoft.Network/bastionHosts" -ResourceName $names.BastionName
     $bastionStep = Ensure-ToolkitBastion -Config $config -Names $names -Location $location -SubscriptionId $subscriptionId -WhatIf:$WhatIfPreference
     if (Test-ToolkitStepSkipped -Step $bastionStep -Message "Bastion setup was skipped; continuing with storage and guest setup.") {
         Write-ToolkitDetail -Message "Deployment will continue without configured Bastion access."
     }
 
+    Set-ToolkitDiagnosticContext -Context $DiagnosticContext -Phase "Azure Files storage" -ResourceType "Microsoft.Storage/storageAccounts" -ResourceName $names.StorageAccountName
     $storageResult = Ensure-ToolkitStorage `
         -Config $config `
         -Names $names `
@@ -179,6 +200,7 @@ function Invoke-AzureSqlVmToolkitDeployment {
     }
 
     if (-not [string]::IsNullOrWhiteSpace([string]$vmIdentity)) {
+        Set-ToolkitDiagnosticContext -Context $DiagnosticContext -Phase "VM Key Vault role" -ResourceType "Microsoft.Authorization/roleAssignments" -ResourceName "Key Vault Secrets User"
         Ensure-ToolkitRoleAssignment -ObjectId $vmIdentity -RoleDefinitionName "Key Vault Secrets User" -Scope $keyVaultResult.Resource.ResourceId -WhatIf:$WhatIfPreference | Out-Null
     }
     else {
@@ -186,9 +208,11 @@ function Invoke-AzureSqlVmToolkitDeployment {
     }
 
     if ($runGuestSetup) {
+        Set-ToolkitDiagnosticContext -Context $DiagnosticContext -Phase "Guest setup" -ResourceType "Microsoft.Compute/virtualMachines/runCommands" -ResourceName $names.VMName
         Ensure-ToolkitGuestSetup -Config $config -Names $names -KeyVaultName $effectiveKeyVaultName -StorageContext $storageResult.Context -WhatIf:$WhatIfPreference | Out-Null
     }
 
+    Set-ToolkitDiagnosticContext -Context $DiagnosticContext -Phase "Completion"
     $stopwatch.Stop()
     Write-ToolkitSuccess -Message "Deployment completed in $($stopwatch.Elapsed.ToString('hh\:mm\:ss'))."
     Write-ToolkitStep -Message "VM Login"

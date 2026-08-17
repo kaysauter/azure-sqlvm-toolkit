@@ -2,6 +2,33 @@ Set-StrictMode -Version 3.0
 
 # Internal deployment implementation. Import AzureSqlVmToolkit.Deployment.psm1 instead of this file.
 
+function Set-ToolkitDiagnosticContext {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSUseShouldProcessForStateChangingFunctions", "", Justification = "This helper only updates an invocation-scoped in-memory hashtable used for diagnostics.")]
+    param(
+        [Parameter(Mandatory = $false)]
+        [hashtable]$Context,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Phase,
+
+        [Parameter(Mandatory = $false)]
+        [AllowNull()]
+        [string]$ResourceType,
+
+        [Parameter(Mandatory = $false)]
+        [AllowNull()]
+        [string]$ResourceName
+    )
+
+    if ($null -eq $Context) {
+        return
+    }
+
+    $Context.Phase = $Phase
+    $Context.ResourceType = $ResourceType
+    $Context.ResourceName = $ResourceName
+}
+
 function Get-ToolkitAzCommand {
     param([Parameter(Mandatory = $true)][string]$Name)
 

@@ -420,6 +420,518 @@ function ConvertTo-ToolkitDeploymentStepResult {
     }
 }
 
+function Protect-ToolkitDiagnosticText {
+    param(
+        [Parameter(Mandatory = $false)]
+        [AllowNull()]
+        [string]$Text
+    )
+
+    if ($null -eq $Text) {
+        return $null
+    }
+
+    $result = [string]$Text
+    if (-not [string]::IsNullOrWhiteSpace($HOME)) {
+        $result = $result.Replace($HOME, "~")
+    }
+
+    $redactions = @(
+        @{
+            Pattern     = '(?is)-----BEGIN (?:RSA |EC |DSA |OPENSSH |ENCRYPTED )?PRIVATE KEY-----.*?-----END (?:RSA |EC |DSA |OPENSSH |ENCRYPTED )?PRIVATE KEY-----'
+            Replacement = '[REDACTED PRIVATE KEY]'
+        },
+        @{
+            Pattern     = '(?i)("(?:Authorization|Proxy-Authorization|x-ms-authorization-auxiliary|Ocp-Apim-Subscription-Key|x-functions-key|x-api-key|api-key|x-auth-token|x-zumo-auth)"\s*:\s*")(?:(?:\\.)|[^"\\])*(")'
+            Replacement = '$1[REDACTED]$2'
+        },
+        @{
+            Pattern     = '(?i)(''(?:Authorization|Proxy-Authorization|x-ms-authorization-auxiliary|Ocp-Apim-Subscription-Key|x-functions-key|x-api-key|api-key|x-auth-token|x-zumo-auth)''\s*:\s*'')(?:(?:\\.)|[^''\\])*('')'
+            Replacement = '$1[REDACTED]$2'
+        },
+        @{
+            Pattern     = '(?im)((?<!["''])\b(?:Authorization|Proxy-Authorization|x-ms-authorization-auxiliary|Ocp-Apim-Subscription-Key|x-functions-key|x-api-key|api-key|x-auth-token|x-zumo-auth)\b\s*[:=]\s*)[^\r\n]+'
+            Replacement = '$1[REDACTED]'
+        },
+        @{
+            Pattern     = '(?i)([?&](?:sig|token|code|key|secret|password|client_secret|access_token|refresh_token)=)[^&#\s]+'
+            Replacement = '$1[REDACTED]'
+        },
+        @{
+            Pattern     = '(?i)(\b(?:Password|Passwd|Pwd|Secret|SecretValue|Secret_Value|AccountKey|Account_Key|SharedAccessKey|Shared_Access_Key|SecretAccessKey|Secret_Access_Key|ClientSecret|Client_Secret|ApiKey|Api_Key|AccessToken|Access_Token|RefreshToken|Refresh_Token|Credential|(?:[A-Z][A-Z0-9]*[_-])+(?:PASSWORD|PASSWD|PWD|SECRET|SECRET[_-]?VALUE|TOKEN|API[_-]?KEY|ACCOUNT[_-]?KEY|PRIVATE[_-]?KEY|CREDENTIAL))\s*=\s*)(?:"[^"]*"|''[^'']*''|[^;\s''"]+)'
+            Replacement = '$1[REDACTED]'
+        },
+        @{
+            Pattern     = '(?i)(["'']?(?:password|passwd|pwd|secret|secret[_-]?value|client[_-]?secret|api[_-]?key|access[_-]?token|refresh[_-]?token|account[_-]?key|sharedaccesskey|secretaccesskey|private[_-]?key|credential|(?:[A-Z][A-Z0-9]*[_-])+(?:PASSWORD|PASSWD|PWD|SECRET|SECRET[_-]?VALUE|TOKEN|API[_-]?KEY|ACCOUNT[_-]?KEY|PRIVATE[_-]?KEY|CREDENTIAL))["'']?\s*:\s*)(?:"[^"]*"|''[^'']*''|[^,;\s}\]]+)'
+            Replacement = '$1[REDACTED]'
+        },
+        @{
+            Pattern     = '(?i)(-{1,2}(?:Password|Secret|SecretValue|ClientSecret|ApiKey|AccessToken|RefreshToken|AccountKey|StorageKey|Credential)\s+)(?:"[^"]*"|''[^'']*''|\S+)'
+            Replacement = '$1[REDACTED]'
+        },
+        @{
+            Pattern     = '(?i)([a-z][a-z0-9+.-]*://[^:/@\s]+:)[^@\s/]+(@)'
+            Replacement = '$1[REDACTED]$2'
+        },
+        @{
+            Pattern     = '(?i)\b(?:gh[pousr]_[A-Za-z0-9]{20,255}|github_pat_[A-Za-z0-9_]{20,255}|sk-(?:proj-)?[A-Za-z0-9_-]{20,}|sk-ant-[A-Za-z0-9_-]{20,}|xox[baprs]-[A-Za-z0-9-]{10,}|AIza[A-Za-z0-9_-]{30,}|npm_[A-Za-z0-9]{20,}|(?:AKIA|ASIA)[A-Z0-9]{16}|eyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,})\b'
+            Replacement = '[REDACTED TOKEN]'
+        }
+    )
+
+    foreach ($redaction in $redactions) {
+        $result = [regex]::Replace($result, $redaction.Pattern, $redaction.Replacement)
+    }
+
+    $highEntropyEvaluator = [System.Text.RegularExpressions.MatchEvaluator]{
+        param([System.Text.RegularExpressions.Match]$Match)
+
+        $value = $Match.Value
+        if (
+            -not [regex]::IsMatch($value, '[a-z]') -or
+            -not [regex]::IsMatch($value, '[A-Z]') -or
+            -not [regex]::IsMatch($value, '[0-9]') -or
+            -not [regex]::IsMatch($value, '[+=!@#$%^&*~]')
+        ) {
+            return $value
+        }
+
+        $frequencies = @{}
+        foreach ($character in $value.ToCharArray()) {
+            $key = [string]$character
+            $frequencies[$key] = 1 + [int]$frequencies[$key]
+        }
+
+        $entropy = 0.0
+        foreach ($count in $frequencies.Values) {
+            $probability = [double]$count / $value.Length
+            $entropy -= $probability * [Math]::Log($probability, 2)
+        }
+
+        if ($entropy -ge 4.0) {
+            return '[REDACTED HIGH-ENTROPY VALUE]'
+        }
+
+        return $value
+    }
+    $result = [regex]::Replace(
+        $result,
+        '(?<![A-Za-z0-9])[A-Za-z0-9+_=!@#$%^&*.~\-]{24,}(?![A-Za-z0-9])',
+        $highEntropyEvaluator
+    )
+
+    return $result
+}
+
+function Resolve-ToolkitErrorLogPath {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$Path
+    )
+
+    try {
+        $candidatePath = $Path
+        $homePrefix = "~$([System.IO.Path]::DirectorySeparatorChar)"
+        if ($candidatePath -eq '~') {
+            $candidatePath = $HOME
+        }
+        elseif ($candidatePath.StartsWith($homePrefix, [System.StringComparison]::Ordinal)) {
+            $candidatePath = [System.IO.Path]::Combine($HOME, $candidatePath.Substring($homePrefix.Length))
+        }
+
+        if ([System.IO.Path]::IsPathRooted($candidatePath)) {
+            $resolvedPath = [System.IO.Path]::GetFullPath($candidatePath)
+        }
+        else {
+            $currentLocation = Get-Location
+            if ($currentLocation.Provider.Name -ne 'FileSystem') {
+                throw "The current PowerShell location is not a file-system location."
+            }
+            $resolvedPath = [System.IO.Path]::GetFullPath(
+                [System.IO.Path]::Combine($currentLocation.ProviderPath, $candidatePath)
+            )
+        }
+    }
+    catch {
+        throw "Error log path '$Path' is not a valid file-system path: $($_.Exception.Message)"
+    }
+
+    if ([System.IO.Directory]::Exists($resolvedPath)) {
+        throw "Error log path '$Path' points to a directory. Specify a file path."
+    }
+
+    $parentPath = [System.IO.Path]::GetDirectoryName($resolvedPath)
+    if ([string]::IsNullOrWhiteSpace($parentPath)) {
+        throw "Error log path '$Path' does not have a valid parent directory."
+    }
+
+    return $resolvedPath
+}
+
+function Resolve-ToolkitErrorLogTargetPath {
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$Path
+    )
+
+    $fullPath = [System.IO.Path]::GetFullPath($Path)
+    $pathComparer = if ($IsWindows) {
+        [System.StringComparer]::OrdinalIgnoreCase
+    }
+    else {
+        [System.StringComparer]::Ordinal
+    }
+    $visitedPaths = [System.Collections.Generic.HashSet[string]]::new($pathComparer)
+    $visitedPaths.Add($fullPath) | Out-Null
+    $readLinkPath = $null
+    if (-not $IsWindows) {
+        $readLinkPath = @('/usr/bin/readlink', '/bin/readlink') |
+            Where-Object { [System.IO.File]::Exists($_) } |
+            Select-Object -First 1
+        if (-not $readLinkPath) {
+            $readLinkCommand = Get-Command -Name 'readlink' -CommandType Application -ErrorAction SilentlyContinue |
+                Select-Object -First 1
+            if ($readLinkCommand) {
+                $readLinkPath = $readLinkCommand.Source
+            }
+        }
+        if (-not $readLinkPath) {
+            throw "Unable to resolve the error log path because the readlink utility is unavailable."
+        }
+    }
+
+    for ($linkDepth = 0; $linkDepth -lt 64; $linkDepth++) {
+        $rootPath = [System.IO.Path]::GetPathRoot($fullPath)
+        $relativePath = $fullPath.Substring($rootPath.Length)
+        $pathSeparators = @([System.IO.Path]::DirectorySeparatorChar)
+        if ([System.IO.Path]::AltDirectorySeparatorChar -ne [System.IO.Path]::DirectorySeparatorChar) {
+            $pathSeparators += [System.IO.Path]::AltDirectorySeparatorChar
+        }
+        $segments = @($relativePath.Split(
+            [char[]]$pathSeparators,
+            [System.StringSplitOptions]::RemoveEmptyEntries
+        ))
+        $currentPath = $rootPath
+        $linkResolved = $false
+
+        for ($segmentIndex = 0; $segmentIndex -lt $segments.Count; $segmentIndex++) {
+            $candidatePath = [System.IO.Path]::Combine($currentPath, $segments[$segmentIndex])
+            $targetValue = $null
+            $itemFullName = $candidatePath
+            if ($IsWindows) {
+                $item = Get-Item -LiteralPath $candidatePath -Force -ErrorAction SilentlyContinue
+                if (-not $item) {
+                    $currentPath = $candidatePath
+                    continue
+                }
+
+                $itemFullName = $item.FullName
+                $linkTypeProperty = $item.PSObject.Properties['LinkType']
+                if (-not $linkTypeProperty -or [string]::IsNullOrWhiteSpace([string]$linkTypeProperty.Value)) {
+                    $currentPath = $itemFullName
+                    continue
+                }
+
+                $targetProperty = $item.PSObject.Properties['Target']
+                if ($targetProperty -and $null -ne $targetProperty.Value) {
+                    $targetValue = [string]@($targetProperty.Value)[0]
+                }
+            }
+            else {
+                $startInfo = [System.Diagnostics.ProcessStartInfo]::new()
+                $startInfo.FileName = $readLinkPath
+                $startInfo.UseShellExecute = $false
+                $startInfo.CreateNoWindow = $true
+                $startInfo.RedirectStandardOutput = $true
+                $startInfo.RedirectStandardError = $true
+                $startInfo.ArgumentList.Add($candidatePath)
+                $process = [System.Diagnostics.Process]::new()
+                $process.StartInfo = $startInfo
+                try {
+                    if (-not $process.Start()) {
+                        throw "Unable to start readlink while preparing the error log."
+                    }
+                    $linkOutput = $process.StandardOutput.ReadToEnd()
+                    $null = $process.StandardError.ReadToEnd()
+                    $process.WaitForExit()
+                    if ($process.ExitCode -ne 0) {
+                        $currentPath = $candidatePath
+                        continue
+                    }
+
+                    if ($linkOutput.EndsWith("`n", [System.StringComparison]::Ordinal)) {
+                        $linkOutput = $linkOutput.Substring(0, $linkOutput.Length - 1)
+                    }
+                    $targetValue = $linkOutput
+                }
+                finally {
+                    $process.Dispose()
+                }
+            }
+            if ([string]::IsNullOrWhiteSpace($targetValue)) {
+                throw "Unable to resolve symbolic link '$candidatePath' while preparing the error log."
+            }
+
+            $targetPath = if ([System.IO.Path]::IsPathRooted($targetValue)) {
+                $targetValue
+            }
+            else {
+                [System.IO.Path]::Combine([System.IO.Path]::GetDirectoryName($itemFullName), $targetValue)
+            }
+            for ($remainingIndex = $segmentIndex + 1; $remainingIndex -lt $segments.Count; $remainingIndex++) {
+                $targetPath = [System.IO.Path]::Combine($targetPath, $segments[$remainingIndex])
+            }
+
+            $fullPath = [System.IO.Path]::GetFullPath($targetPath)
+            if (-not $visitedPaths.Add($fullPath)) {
+                throw "A symbolic-link cycle was detected while preparing error log path '$Path'."
+            }
+            $linkResolved = $true
+            break
+        }
+
+        if (-not $linkResolved) {
+            return [System.IO.Path]::GetFullPath($currentPath)
+        }
+    }
+
+    throw "Error log path '$Path' contains too many symbolic-link levels."
+}
+
+function Get-ToolkitErrorLogMutexName {
+    param(
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$Path
+    )
+
+    $lockIdentity = if ($IsWindows) { $Path.ToUpperInvariant() } else { $Path }
+    $pathBytes = [System.Text.Encoding]::UTF8.GetBytes($lockIdentity)
+    $sha256 = [System.Security.Cryptography.SHA256]::Create()
+    try {
+        $pathHash = -join ($sha256.ComputeHash($pathBytes) | ForEach-Object { $_.ToString('x2') })
+    }
+    finally {
+        $sha256.Dispose()
+    }
+
+    return "AzureSqlVmToolkit.ErrorLog.$pathHash"
+}
+
+function Set-ToolkitErrorLogFilePermission {
+    [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSUseShouldProcessForStateChangingFunctions", "", Justification = "The caller explicitly opted into the diagnostic file, which must be restricted before sensitive metadata is written.")]
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Path
+    )
+
+    if ($IsWindows) {
+        $owner = [System.Security.Principal.WindowsIdentity]::GetCurrent().User
+        $acl = [System.Security.AccessControl.FileSecurity]::new()
+        $acl.SetOwner($owner)
+        $acl.SetAccessRuleProtection($true, $false)
+        foreach ($sid in @(
+            $owner,
+            [System.Security.Principal.SecurityIdentifier]::new("S-1-5-18"),
+            [System.Security.Principal.SecurityIdentifier]::new("S-1-5-32-544")
+        )) {
+            $rule = [System.Security.AccessControl.FileSystemAccessRule]::new(
+                $sid,
+                [System.Security.AccessControl.FileSystemRights]::FullControl,
+                [System.Security.AccessControl.AccessControlType]::Allow
+            )
+            $acl.AddAccessRule($rule)
+        }
+        Set-Acl -LiteralPath $Path -AclObject $acl -ErrorAction Stop
+        return
+    }
+
+    $chmod = Get-Command -Name "chmod" -CommandType Application -ErrorAction SilentlyContinue
+    if (-not $chmod) {
+        throw "Unable to restrict error log permissions because chmod is unavailable."
+    }
+
+    & $chmod.Source "600" $Path
+    if ($LASTEXITCODE -ne 0) {
+        throw "Unable to restrict error log permissions for '$Path'."
+    }
+}
+
+function ConvertTo-ToolkitErrorLogRecord {
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Management.Automation.ErrorRecord]$ErrorRecord,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$RunId,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("Deployment", "Plan", "WhatIf")]
+        [string]$Mode,
+
+        [Parameter(Mandatory = $false)]
+        [hashtable]$DiagnosticContext = @{},
+
+        [Parameter(Mandatory = $false)]
+        [string]$ToolkitVersion
+    )
+
+    $rawErrorDetails = if ($ErrorRecord.ErrorDetails) { $ErrorRecord.ErrorDetails.Message } else { $null }
+    $exceptionMessage = Protect-ToolkitDiagnosticText -Text $ErrorRecord.Exception.Message
+    $errorDetails = Protect-ToolkitDiagnosticText -Text $rawErrorDetails
+    $correlationSource = "$($ErrorRecord.Exception.Message) $rawErrorDetails"
+    $correlationMatch = [regex]::Match(
+        $correlationSource,
+        '(?i)\b(?:(?:x-ms-)?(?:correlation|tracking|request)(?:-request)?)[\s_-]*id\s*[:=]\s*["'']?(?<id>[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})'
+    )
+    $correlationId = if ($correlationMatch.Success) { $correlationMatch.Groups['id'].Value } else { $null }
+
+    $sourceFile = $null
+    $sourceLine = $null
+    if ($ErrorRecord.InvocationInfo) {
+        if (-not [string]::IsNullOrWhiteSpace($ErrorRecord.InvocationInfo.ScriptName)) {
+            $sourceFile = Split-Path -Leaf $ErrorRecord.InvocationInfo.ScriptName
+        }
+        if ($ErrorRecord.InvocationInfo.ScriptLineNumber -gt 0) {
+            $sourceLine = $ErrorRecord.InvocationInfo.ScriptLineNumber
+        }
+    }
+
+    return [ordered]@{
+        schemaVersion      = 1
+        timestampUtc       = [DateTime]::UtcNow.ToString('o')
+        runId              = $RunId
+        toolkitVersion     = $ToolkitVersion
+        command            = 'New-AzureSqlVmToolkitDeployment'
+        mode               = $Mode
+        phase              = Protect-ToolkitDiagnosticText -Text ([string]$DiagnosticContext['Phase'])
+        resource           = [ordered]@{
+            type = Protect-ToolkitDiagnosticText -Text ([string]$DiagnosticContext['ResourceType'])
+            name = Protect-ToolkitDiagnosticText -Text ([string]$DiagnosticContext['ResourceName'])
+        }
+        error              = [ordered]@{
+            exceptionType   = $ErrorRecord.Exception.GetType().FullName
+            message         = $exceptionMessage
+            details         = $errorDetails
+            errorId         = Protect-ToolkitDiagnosticText -Text $ErrorRecord.FullyQualifiedErrorId
+            category        = [string]$ErrorRecord.CategoryInfo.Category
+            target          = Protect-ToolkitDiagnosticText -Text ([string]$ErrorRecord.CategoryInfo.TargetName)
+            scriptStackTrace = Protect-ToolkitDiagnosticText -Text $ErrorRecord.ScriptStackTrace
+        }
+        source             = [ordered]@{
+            file = Protect-ToolkitDiagnosticText -Text $sourceFile
+            line = $sourceLine
+        }
+        azureCorrelationId = $correlationId
+        runtime            = [ordered]@{
+            powershellVersion = $PSVersionTable.PSVersion.ToString()
+            edition           = $PSVersionTable.PSEdition
+        }
+    }
+}
+
+function Write-ToolkitErrorLog {
+    [CmdletBinding()]
+    param(
+        [Parameter(Mandatory = $true)]
+        [System.Management.Automation.ErrorRecord]$ErrorRecord,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$Path,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateNotNullOrEmpty()]
+        [string]$RunId,
+
+        [Parameter(Mandatory = $true)]
+        [ValidateSet("Deployment", "Plan", "WhatIf")]
+        [string]$Mode,
+
+        [Parameter(Mandatory = $false)]
+        [hashtable]$DiagnosticContext = @{},
+
+        [Parameter(Mandatory = $false)]
+        [string]$ToolkitVersion
+    )
+
+    $resolvedPath = Resolve-ToolkitErrorLogPath -Path $Path
+    $record = ConvertTo-ToolkitErrorLogRecord `
+        -ErrorRecord $ErrorRecord `
+        -RunId $RunId `
+        -Mode $Mode `
+        -DiagnosticContext $DiagnosticContext `
+        -ToolkitVersion $ToolkitVersion
+    $jsonLine = ($record | ConvertTo-Json -Depth 8 -Compress) + [Environment]::NewLine
+    $bytes = [System.Text.UTF8Encoding]::new($false).GetBytes($jsonLine)
+
+    $targetPath = Resolve-ToolkitErrorLogTargetPath -Path $resolvedPath
+    $parentPath = [System.IO.Path]::GetDirectoryName($targetPath)
+    if (-not [System.IO.Directory]::Exists($parentPath)) {
+        [System.IO.Directory]::CreateDirectory($parentPath) | Out-Null
+    }
+    if (-not [System.IO.Directory]::Exists($parentPath)) {
+        throw "The error log parent path '$parentPath' is not a directory."
+    }
+    if ([System.IO.Directory]::Exists($targetPath)) {
+        throw "Error log path '$targetPath' points to a directory. Specify a file path."
+    }
+
+    $mutexName = Get-ToolkitErrorLogMutexName -Path $targetPath
+    $mutex = [System.Threading.Mutex]::new($false, $mutexName)
+    $stream = $null
+    $lockTaken = $false
+    try {
+        try {
+            $lockTaken = $mutex.WaitOne([TimeSpan]::FromSeconds(15))
+        }
+        catch [System.Threading.AbandonedMutexException] {
+            $lockTaken = $true
+        }
+
+        if (-not $lockTaken) {
+            throw "Timed out waiting to write the error log '$targetPath'."
+        }
+
+        for ($openAttempt = 1; $openAttempt -le 20; $openAttempt++) {
+            try {
+                $stream = [System.IO.FileStream]::new(
+                    $targetPath,
+                    [System.IO.FileMode]::OpenOrCreate,
+                    [System.IO.FileAccess]::ReadWrite,
+                    [System.IO.FileShare]::Read
+                )
+                break
+            }
+            catch [System.IO.IOException] {
+                if ($openAttempt -eq 20) {
+                    throw
+                }
+                Start-Sleep -Milliseconds (25 * $openAttempt)
+            }
+        }
+
+        Set-ToolkitErrorLogFilePermission -Path $targetPath
+        $stream.Seek(0, [System.IO.SeekOrigin]::End) | Out-Null
+        $stream.Write($bytes, 0, $bytes.Length)
+        $stream.Flush($true)
+        return [pscustomobject]$record
+    }
+    finally {
+        if ($stream) {
+            $stream.Dispose()
+        }
+        if ($lockTaken) {
+            $mutex.ReleaseMutex()
+        }
+        $mutex.Dispose()
+    }
+}
+
 function Write-ToolkitMessage {
     [Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingWriteHost", "", Justification = "The toolkit is an interactive deployment command and uses color to distinguish message intent.")]
     param(
@@ -835,6 +1347,10 @@ Export-ModuleMember -Function @(
     "Get-ToolkitGeneratedPassword",
     "Get-ToolkitResourceNameSet",
     "ConvertTo-ToolkitDeploymentStepResult",
+    "Protect-ToolkitDiagnosticText",
+    "Resolve-ToolkitErrorLogPath",
+    "ConvertTo-ToolkitErrorLogRecord",
+    "Write-ToolkitErrorLog",
     "Compare-ToolkitResourceProperty",
     "Assert-ToolkitNoBlockingDrift",
     "Write-ToolkitMessage",

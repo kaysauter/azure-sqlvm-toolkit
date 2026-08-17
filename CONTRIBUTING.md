@@ -41,6 +41,7 @@ Use ignored local files for environment-specific settings:
 - `*.local.yaml`
 - `*.local.md`
 - `.env`
+- `test-results/`
 
 Do not commit secrets, generated cost notes, screenshots, terminal output, or config values that reveal Azure tenant, subscription, object, IP, host, account, or secret details.
 
@@ -118,6 +119,7 @@ git diff --check
 - PowerShell Gallery package `sha256` values are rejected because the current install path cannot enforce them.
 - Package `sourceUri` values are review/provenance references only, not install sources.
 - Prefer prepared images or internal package mirrors for stronger environments.
+- Keep `-ErrorLogPath` output in a trusted local directory and review diagnostics before sharing them.
 
 ## Documentation Guidelines
 

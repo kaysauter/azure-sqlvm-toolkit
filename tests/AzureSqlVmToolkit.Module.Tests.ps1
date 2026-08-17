@@ -54,6 +54,85 @@ Describe "New-AzureSqlVmToolkitDeployment" {
         $command.Parameters.Keys | Should -Contain "Plan"
         $command.Parameters.Keys | Should -Contain "WhatIf"
     }
+
+    It "exposes structured error logging as an opt-in parameter" {
+        $command = Get-Command New-AzureSqlVmToolkitDeployment
+
+        $command.Parameters.Keys | Should -Contain "ErrorLogPath"
+    }
+
+    It "logs plan failures and preserves the terminating error" {
+        $missingConfig = Join-Path $TestDrive "missing-config.yaml"
+        $errorLog = Join-Path $TestDrive "logs/plan-errors.jsonl"
+
+        { New-AzureSqlVmToolkitDeployment -ConfigFile $missingConfig -Plan -ErrorLogPath $errorLog } |
+            Should -Throw -ExpectedMessage "*Configuration file not found*"
+
+        $record = Get-Content -LiteralPath $errorLog | Select-Object -First 1 | ConvertFrom-Json
+        $record.schemaVersion | Should -Be 1
+        $record.mode | Should -Be "Plan"
+        $record.phase | Should -Be "Configuration"
+        $record.command | Should -Be "New-AzureSqlVmToolkitDeployment"
+    }
+
+    It "logs WhatIf failures without changing the original error" {
+        $missingConfig = Join-Path $TestDrive "missing-whatif-config.yaml"
+        $errorLog = Join-Path $TestDrive "logs/whatif-errors.jsonl"
+
+        { New-AzureSqlVmToolkitDeployment -ConfigFile $missingConfig -WhatIf -ErrorLogPath $errorLog } |
+            Should -Throw -ExpectedMessage "*Configuration file not found*"
+
+        $record = Get-Content -LiteralPath $errorLog | Select-Object -First 1 | ConvertFrom-Json
+        $record.mode | Should -Be "WhatIf"
+        $record.phase | Should -Be "Configuration"
+    }
+
+    It "does not create an error-log directory for a successful plan" {
+        $errorLog = Join-Path $TestDrive "unused-plan-log/errors.jsonl"
+
+        New-AzureSqlVmToolkitDeployment `
+            -ConfigFile (Join-Path $repoRoot "config.yaml") `
+            -Plan `
+            -ErrorLogPath $errorLog
+
+        Test-Path (Split-Path -Parent $errorLog) | Should -BeFalse
+        Test-Path $errorLog | Should -BeFalse
+    }
+
+    It "preserves the deployment error when diagnostic writing also fails" {
+        $missingConfig = Join-Path $TestDrive "missing-logger-failure.yaml"
+        $baselineError = try {
+            New-AzureSqlVmToolkitDeployment -ConfigFile $missingConfig -Plan
+        }
+        catch {
+            $_
+        }
+        Mock -ModuleName AzureSqlVmToolkit -CommandName Write-ToolkitErrorLog -MockWith {
+            throw "Simulated diagnostic writer failure."
+        }
+
+        $previousWarningPreference = $WarningPreference
+        try {
+            $WarningPreference = "Stop"
+            $loggedError = try {
+                New-AzureSqlVmToolkitDeployment `
+                    -ConfigFile $missingConfig `
+                    -Plan `
+                    -ErrorLogPath (Join-Path $TestDrive "logger-failure/errors.jsonl")
+            }
+            catch {
+                $_
+            }
+        }
+        finally {
+            $WarningPreference = $previousWarningPreference
+        }
+
+        $loggedError.Exception.Message | Should -Be $baselineError.Exception.Message
+        $loggedError.Exception.GetType().FullName | Should -Be $baselineError.Exception.GetType().FullName
+        $loggedError.FullyQualifiedErrorId | Should -Be $baselineError.FullyQualifiedErrorId
+        $loggedError.CategoryInfo.Category | Should -Be $baselineError.CategoryInfo.Category
+    }
 }
 
 Describe "config.schema.json" {

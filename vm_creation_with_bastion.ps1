@@ -13,7 +13,11 @@ param(
     [switch]$SecurityAssessmentAdvice,
 
     [Parameter(Mandatory = $false)]
-    [switch]$Plan
+    [switch]$Plan,
+
+    [Parameter(Mandatory = $false)]
+    [ValidateNotNullOrEmpty()]
+    [string]$ErrorLogPath
 )
 
 $ErrorActionPreference = "Stop"
@@ -40,6 +44,10 @@ if ($SecurityAssessmentAdvice) {
 
 if ($Plan) {
     $arguments.Plan = $true
+}
+
+if ($PSBoundParameters.ContainsKey("ErrorLogPath")) {
+    $arguments.ErrorLogPath = $ErrorLogPath
 }
 
 New-AzureSqlVmToolkitDeployment @arguments -WhatIf:$WhatIfPreference

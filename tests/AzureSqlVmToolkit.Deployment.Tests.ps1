@@ -355,3 +355,18 @@ Describe "Guest install script generation" {
         { Get-ToolkitGuestInstallScript -Config $config } | Should -Throw -ExpectedMessage "*sha256 is only supported for Chocolatey*"
     }
 }
+
+Describe "Deployment diagnostic phases" {
+    It "reports the no-Azure plan phase through the shared diagnostic context" {
+        $context = @{}
+
+        Invoke-AzureSqlVmToolkitDeployment `
+            -ConfigFile (Join-Path $repoRoot "config.yaml") `
+            -Plan `
+            -DiagnosticContext $context
+
+        $context.Phase | Should -Be "Plan"
+        $context.ResourceType | Should -BeNullOrEmpty
+        $context.ResourceName | Should -BeNullOrEmpty
+    }
+}
