@@ -67,11 +67,11 @@ jobs:
           cache: npm
           cache-dependency-path: docs-site/package-lock.json
 
+      - name: Audit dependencies
+        run: npm run audit:dependencies
+
       - name: Install dependencies
         run: npm ci
-
-      - name: Audit dependencies
-        run: npm audit --audit-level=moderate
 
       - name: Build documentation
         run: npm run build

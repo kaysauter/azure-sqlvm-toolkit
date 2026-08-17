@@ -28,6 +28,7 @@ All notable changes to AzureSqlVmToolkit are tracked here.
 - GitHub Actions install pinned PowerShell module versions for repeatable test and release runs.
 - README and Astro documentation now describe package checksum behavior, contributor workflow, and current development guidance.
 - Root and Astro documentation now describe structured error-log usage, automation, and handling requirements.
+- Documentation dependencies now use patched Astro, Starlight, DOMPurify, JS-YAML, Mermaid, Nano ID, and PostCSS releases.
 
 ### Security
 
@@ -35,6 +36,7 @@ All notable changes to AzureSqlVmToolkit are tracked here.
 - Guest setup now distinguishes pinned package metadata from unverified legacy script execution.
 - Chocolatey package `sha256` values are enforced through `choco install --checksum`; PowerShell Gallery package `sha256` values are rejected because the current install path cannot enforce them.
 - Diagnostic logs redact known secret patterns, use restrictive file permissions, and preserve the original deployment error if logging fails.
+- Documentation CI retains its moderate vulnerability threshold and uses expiring, path-specific exceptions for two `image-size` advisories that currently have no patched upstream release.
 
 ## 0.1.0
 
