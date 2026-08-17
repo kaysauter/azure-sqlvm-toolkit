@@ -106,6 +106,29 @@ New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -WhatIf
 
 This queries Azure, reports whether resources would be created, reused, updated, or blocked by drift, and does not perform the mutating actions.
 
+## Optional Error Log
+
+Add `-ErrorLogPath` to a plan, WhatIf, or deployment command when you want machine-readable diagnostics for automated testing or troubleshooting:
+
+```powershell
+New-AzureSqlVmToolkitDeployment `
+  -ConfigFile .\config.local.yaml `
+  -Plan `
+  -ErrorLogPath .\test-results\errors\deployment.jsonl
+```
+
+A successful command creates neither the log file nor its directory. A terminating failure appends one sanitized JSON object with the run ID, mode, deployment phase, resource context, error category, source location, and an Azure correlation ID when one is available.
+
+Inspect the records with PowerShell:
+
+```powershell
+Get-Content .\test-results\errors\deployment.jsonl |
+  ForEach-Object { $_ | ConvertFrom-Json } |
+  Select-Object timestampUtc, runId, mode, phase, azureCorrelationId
+```
+
+Redaction is defense in depth, not a guarantee that arbitrary exception text contains no sensitive data. Store logs in a private, user-controlled directory and review them before uploading or sharing them.
+
 ## Deploy
 
 With a pre-created password secret:

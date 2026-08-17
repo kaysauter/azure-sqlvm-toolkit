@@ -29,3 +29,5 @@ This validates config, reads Azure state, reports create/reuse/update/drift deci
 - Use `-Plan` before signing in, while editing YAML, or when you only need resolved resource names.
 - Use `-WhatIf` after signing in, when you need to know what the toolkit would do against the current subscription.
 - Use a real deployment only after `-WhatIf` reports expected drift and update decisions.
+
+Both modes accept `-ErrorLogPath` for opt-in JSONL diagnostics when the command terminates with an error. Successful previews create no log file.

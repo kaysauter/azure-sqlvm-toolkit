@@ -16,6 +16,7 @@ AzSQLVMKit is lab software. Do not treat it as production-ready.
 - Missing VM admin passwords require `-GeneratePassword`.
 - Password output requires `-ShowPassword`.
 - Azure-aware `-WhatIf` reads existing resources and reports drift before writes.
+- Structured failure logs require the explicit `-ErrorLogPath` parameter.
 
 ## Network
 
@@ -49,6 +50,16 @@ The script creates new vaults with RBAC authorization and resolves user or servi
 - `Key Vault Secrets User` to the VM managed identity.
 
 The VM identity uses that permission to retrieve the storage account key secret for the Azure Files mount.
+
+## Diagnostic Logs
+
+`-ErrorLogPath` writes a JSONL record only when the command terminates with an error. Records contain useful operational context and redact known credential, authorization-header, key, token, SAS, private-key, connection-string, and high-entropy patterns.
+
+:::caution[Error logs still require careful handling]
+Redaction is defense in depth, not a guarantee. External provider messages can contain formats the toolkit does not recognize. Use a private, user-controlled directory, avoid shared writable locations such as `/tmp`, and review logs before sharing or publishing them as CI artifacts.
+:::
+
+Unix files are restricted to mode `0600`. Windows ACLs allow the current user, SYSTEM, and local Administrators. A logging failure does not replace the original deployment error.
 
 ## Guest Setup
 

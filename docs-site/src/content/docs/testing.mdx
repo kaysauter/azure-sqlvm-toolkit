@@ -28,3 +28,19 @@ Install-Module -Name PSScriptAnalyzer -RequiredVersion 1.25.0 -Scope CurrentUser
 ```
 
 GitHub Actions runs the same local check for toolkit script/config/test changes, and also runs the docs build plus `npm audit`.
+
+## Failure Artifacts For Automation
+
+Use `-ErrorLogPath` to give automated plan, WhatIf, or deployment tests a machine-readable JSONL artifact when the command fails:
+
+```powershell
+$errorLog = ".\test-results\errors\deployment.jsonl"
+New-AzureSqlVmToolkitDeployment `
+  -ConfigFile .\config.local.yaml `
+  -Plan `
+  -ErrorLogPath $errorLog
+```
+
+No file is created on success. On failure, use `runId`, `mode`, `phase`, `resource.type`, `resource.name`, and `azureCorrelationId` to group and diagnose runs. Keep the artifact private and review it before publishing it from CI.
+
+Pester coverage verifies redaction, JSONL integrity, restrictive Unix permissions, concurrent writers, path aliases, phase tracking, Plan and WhatIf behavior, and preservation of the original error when diagnostic writing fails.

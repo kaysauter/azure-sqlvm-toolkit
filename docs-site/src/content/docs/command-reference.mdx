@@ -17,6 +17,7 @@ New-AzureSqlVmToolkitDeployment `
   [-GeneratePassword] `
   [-ShowPassword] `
   [-SecurityAssessmentAdvice] `
+  [-ErrorLogPath <string>] `
   [-Plan] `
   [-WhatIf] `
   [-Confirm]
@@ -28,6 +29,7 @@ New-AzureSqlVmToolkitDeployment `
 | `-GeneratePassword` | off | Allows the toolkit to create a missing VM admin password secret for lab/demo use. |
 | `-ShowPassword` | off | Prints the VM admin password. Use only in controlled demos. |
 | `-SecurityAssessmentAdvice` | off | Prints current safety posture and warnings. |
+| `-ErrorLogPath` | unset | Appends sanitized JSONL diagnostics when the command terminates with an error. Successful commands create no log. |
 | `-Plan` | off | Validates config and prints the intended plan without Azure calls. |
 | `-WhatIf` | off | Reads Azure state and reports create/reuse/update/drift decisions without mutating resources. Requires `Connect-AzAccount`. |
 | `-Confirm` | PowerShell preference | Uses PowerShell confirmation support for the public command. |
@@ -57,6 +59,17 @@ Deploy to a disposable lab and generate the missing password secret:
 New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessmentAdvice -GeneratePassword
 ```
 
+Capture structured failure diagnostics:
+
+```powershell
+New-AzureSqlVmToolkitDeployment `
+  -ConfigFile .\config.local.yaml `
+  -Plan `
+  -ErrorLogPath .\test-results\errors\deployment.jsonl
+```
+
+Each JSONL record includes a run ID, mode, deployment phase, resource context, sanitized error details, source location, runtime version, and an Azure correlation ID when available. Use a trusted local directory and review the file before sharing it.
+
 ## `Test-AzureSqlVmToolkitConfig`
 
 ```powershell
@@ -75,6 +88,7 @@ The root script remains as a compatibility entry point for existing users.
   [-GeneratePassword] `
   [-ShowPassword] `
   [-SecurityAssessmentAdvice] `
+  [-ErrorLogPath <string>] `
   [-Plan] `
   [-WhatIf] `
   [-Confirm]
@@ -86,6 +100,7 @@ The root script remains as a compatibility entry point for existing users.
 | `-GeneratePassword` | off | Allows the script to create a missing VM admin password secret for lab/demo use. |
 | `-ShowPassword` | off | Prints the VM admin password. Use only in controlled demos. |
 | `-SecurityAssessmentAdvice` | off | Prints current safety posture and warnings. |
+| `-ErrorLogPath` | unset | Forwards the structured failure-log path to the module command. |
 | `-Plan` | off | Validates config and prints the intended plan without Azure calls. |
 | `-WhatIf` | off | Compatibility wrapper for the module command's Azure-aware `-WhatIf`. |
 

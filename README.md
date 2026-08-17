@@ -23,6 +23,7 @@ AzureSqlVmToolkit ships as a PowerShell module plus YAML config for creating an 
 - Mounts Azure Files in the VM.
 - Uploads `restore-databases.ps1` for manual `.bak` restores from the mounted share.
 - Provides a module command, no-Azure `-Plan` mode, Azure-aware `-WhatIf`, and a local validation script.
+- Writes sanitized JSONL diagnostics on terminating failures only when `-ErrorLogPath` is supplied.
 - Keeps validation, naming, password, release, and guest-script helpers in `scripts/` so they can be tested without deploying Azure resources.
 - Uses internal `Ensure-*` functions for Azure create/reuse decisions and early drift handling.
 - Tracks release versions through `VERSION`, `AzureSqlVmToolkit.psd1`, `CHANGELOG.md`, and the `Release toolkit` workflow.
@@ -84,6 +85,17 @@ New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessm
 
 Use `-ShowPassword` only for controlled demos where console output is acceptable.
 
+To capture structured diagnostics for a failed plan, WhatIf, or deployment, opt in with `-ErrorLogPath`:
+
+```powershell
+New-AzureSqlVmToolkitDeployment `
+  -ConfigFile .\config.local.yaml `
+  -Plan `
+  -ErrorLogPath .\test-results\errors\deployment.jsonl
+```
+
+The toolkit creates the JSONL file only if the command terminates with an error. Use a private, user-controlled directory and review the file before sharing it.
+
 ## Config Shape
 
 The module and compatibility script read the explicit YAML shape in `config.yaml`. The editor-facing JSON schema is in `schemas/config.schema.json`.
@@ -121,6 +133,7 @@ If you intentionally enable `network.publicIp.enabled`, keep NSG sources tightly
 - Prefer a pre-created VM admin password secret in Key Vault.
 - Treat `-GeneratePassword` as lab/demo convenience only.
 - Treat `-ShowPassword` as sensitive console output.
+- Treat `-ErrorLogPath` output as sensitive operational data even though known credential patterns are redacted.
 - Review `softwareInstalls.packages`, `allowDynamicBootstrap`, and `installScript`; guest setup still runs inside the VM with deployment-time trust in the configured package sources.
 - The storage account key is stored in Key Vault and read by the VM managed identity to mount Azure Files.
 

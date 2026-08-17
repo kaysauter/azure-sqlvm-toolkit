@@ -49,6 +49,8 @@ Write-Host "Running config validation and plan..."
 
 $scriptAnalyzer = Get-Module -ListAvailable -Name PSScriptAnalyzer | Select-Object -First 1
 if ($scriptAnalyzer) {
+    # Analyze source in a clean command namespace after the plan smoke test imports the toolkit.
+    Remove-Module AzureSqlVmToolkit -Force -ErrorAction SilentlyContinue
     Write-Host "Running PSScriptAnalyzer..."
     $analysis = foreach ($file in $files) {
         try {

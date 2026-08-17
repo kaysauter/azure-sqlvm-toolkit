@@ -15,6 +15,8 @@ All notable changes to AzureSqlVmToolkit are tracked here.
 - `VERSION` source-of-truth file plus manifest version alignment checks.
 - GitHub release workflow that validates version metadata, runs local checks, builds docs, packages the module, and creates a release from `vX.Y.Z` tags.
 - Contributor guide covering repository layout, local setup, development workflow, checks, security rules, documentation expectations, and release guidance.
+- Opt-in `-ErrorLogPath` support for sanitized JSONL diagnostics on terminating plan, WhatIf, and deployment failures.
+- Deployment phase and resource context tracking for structured failure diagnostics.
 
 ### Changed
 
@@ -25,12 +27,16 @@ All notable changes to AzureSqlVmToolkit are tracked here.
 - Bastion creation now skips cleanly when the Bastion public IP step is skipped.
 - GitHub Actions install pinned PowerShell module versions for repeatable test and release runs.
 - README and Astro documentation now describe package checksum behavior, contributor workflow, and current development guidance.
+- Root and Astro documentation now describe structured error-log usage, automation, and handling requirements.
+- Documentation dependencies now use patched Astro, Starlight, DOMPurify, JS-YAML, Mermaid, Nano ID, and PostCSS releases.
 
 ### Security
 
 - Existing resources with unsafe or immutable drift now fail earlier instead of being silently reused.
 - Guest setup now distinguishes pinned package metadata from unverified legacy script execution.
 - Chocolatey package `sha256` values are enforced through `choco install --checksum`; PowerShell Gallery package `sha256` values are rejected because the current install path cannot enforce them.
+- Diagnostic logs redact known secret patterns, use restrictive file permissions, and preserve the original deployment error if logging fails.
+- Documentation CI retains its moderate vulnerability threshold and uses expiring, path-specific exceptions for two `image-size` advisories that currently have no patched upstream release.
 
 ## 0.1.0
 

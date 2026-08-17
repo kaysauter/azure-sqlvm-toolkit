@@ -42,6 +42,19 @@ New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -SecurityAssessm
 
 `-Plan` does not call Azure. It validates the YAML and prints intended resource names and safety posture.
 
+## Optional Failure Diagnostics
+
+Add `-ErrorLogPath` when you want JSONL diagnostics for automated testing or troubleshooting:
+
+```powershell
+New-AzureSqlVmToolkitDeployment `
+  -ConfigFile .\config.local.yaml `
+  -Plan `
+  -ErrorLogPath .\test-results\errors\deployment.jsonl
+```
+
+The toolkit creates the file only after a terminating failure. Store it in a private, user-controlled directory and review it before sharing it.
+
 ## Deploy
 
 With an existing Key Vault password secret:

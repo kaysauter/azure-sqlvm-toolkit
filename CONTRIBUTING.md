@@ -41,6 +41,7 @@ Use ignored local files for environment-specific settings:
 - `*.local.yaml`
 - `*.local.md`
 - `.env`
+- `test-results/`
 
 Do not commit secrets, generated cost notes, screenshots, terminal output, or config values that reveal Azure tenant, subscription, object, IP, host, account, or secret details.
 
@@ -87,8 +88,10 @@ For docs dependency changes, also run:
 
 ```bash
 cd docs-site
-npm audit
+npm run audit:dependencies
 ```
+
+The dependency audit keeps development dependencies in scope and fails on new moderate-or-higher findings. Temporary exceptions live in `docs-site/audit-ci.jsonc`; each exception must be path-specific, documented, time-limited, and security-reviewed.
 
 Always run:
 
@@ -118,6 +121,8 @@ git diff --check
 - PowerShell Gallery package `sha256` values are rejected because the current install path cannot enforce them.
 - Package `sourceUri` values are review/provenance references only, not install sources.
 - Prefer prepared images or internal package mirrors for stronger environments.
+- Keep `-ErrorLogPath` output in a trusted local directory and review diagnostics before sharing them.
+- Do not broaden or renew dependency-audit exceptions without reassessing exploitability and available upstream fixes.
 
 ## Documentation Guidelines
 

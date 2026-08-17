@@ -15,6 +15,7 @@ The tracked script and sample config now use these safer lab defaults:
 - Missing VM admin passwords are not generated unless `-GeneratePassword` is supplied.
 - VM passwords are not printed unless `-ShowPassword` is supplied.
 - Azure-aware `-WhatIf` reads existing resources and reports create/reuse/update/drift decisions before writes.
+- Structured failure diagnostics are disabled unless `-ErrorLogPath` is supplied.
 
 Preview the posture without Azure calls:
 
@@ -61,6 +62,28 @@ New-AzureSqlVmToolkitDeployment -ConfigFile .\config.local.yaml -GeneratePasswor
 
 `-ShowPassword` prints the VM password to the console. Use it only for controlled demos because terminal scrollback, logs, screenshots, or shared notes can capture it.
 
+## Diagnostic Error Logs
+
+`-ErrorLogPath` opts into newline-delimited JSON diagnostics for terminating failures:
+
+```powershell
+New-AzureSqlVmToolkitDeployment `
+  -ConfigFile .\config.local.yaml `
+  -WhatIf `
+  -ErrorLogPath .\test-results\errors\deployment.jsonl
+```
+
+Successful commands do not create the file or its parent directory. Failure records include operational metadata such as the run ID, mode, deployment phase, resource name and type, source location, stack trace, and Azure request or correlation ID when available.
+
+The toolkit redacts known password, token, key, authorization-header, SAS, connection-string, private-key, and high-entropy patterns before serialization. This reduces accidental disclosure but cannot guarantee that arbitrary provider or exception text contains no sensitive information.
+
+- Use a trusted, user-controlled local directory. Do not place logs directly in a shared writable directory such as `/tmp`.
+- Keep logs under the ignored `test-results/` directory when practical.
+- Review every log before attaching it to an issue, test artifact, email, or chat.
+- Delete logs when they are no longer needed.
+
+On Unix, the file is restricted to mode `0600`. On Windows, its ACL is restricted to the current user, SYSTEM, and local Administrators. The toolkit serializes its own concurrent writers, but the file is not tamper-proof. If diagnostic writing fails, the command warns and preserves the original deployment error.
+
 ## Key Vault And Identity
 
 New Key Vaults are created with RBAC authorization. The script resolves user and service-principal Azure contexts for Key Vault RBAC assignment. It assigns:
@@ -96,6 +119,7 @@ Keep local-only files out of commits:
 - `*.local.yaml`
 - `*.local.md`
 - `.env`
+- `test-results/`
 - screenshots that reveal Azure tenant, subscription, IP, object, or secret values
 
 The repository ignores those local patterns.

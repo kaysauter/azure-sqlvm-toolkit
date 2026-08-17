@@ -1,0 +1,40 @@
+{
+  "$schema": "https://github.com/IBM/audit-ci/raw/main/docs/schema.json",
+  "moderate": true,
+  "package-manager": "npm",
+  "pass-enoaudit": false,
+  "show-found": true,
+  "show-not-found": true,
+  "skip-dev": false,
+  "report-type": "important",
+  "allowlist": [
+    {
+      "GHSA-w3rx-r6r6-pgpr|@slidev/cli>pptxgenjs>image-size": {
+        "active": true,
+        "expiry": "2026-10-16",
+        "notes": "No patched image-size release exists. Static Slidev builds do not invoke Node-side PPTX export; reassess before accepting untrusted images or adding Node-side PPTX generation."
+      }
+    },
+    {
+      "GHSA-w3rx-r6r6-pgpr|@slidev/client>pptxgenjs>image-size>": {
+        "active": true,
+        "expiry": "2026-10-16",
+        "notes": "No patched image-size release exists. PptxGenJS disables image-size in its browser bundle; reassess before accepting untrusted images or adding Node-side PPTX generation."
+      }
+    },
+    {
+      "GHSA-5p2g-fcmc-qvqq|@slidev/cli>pptxgenjs>image-size": {
+        "active": true,
+        "expiry": "2026-10-16",
+        "notes": "No patched image-size release exists. Static Slidev builds do not invoke Node-side PPTX export; reassess before accepting untrusted images or adding Node-side PPTX generation."
+      }
+    },
+    {
+      "GHSA-5p2g-fcmc-qvqq|@slidev/client>pptxgenjs>image-size>": {
+        "active": true,
+        "expiry": "2026-10-16",
+        "notes": "No patched image-size release exists. PptxGenJS disables image-size in its browser bundle; reassess before accepting untrusted images or adding Node-side PPTX generation."
+      }
+    }
+  ]
+}

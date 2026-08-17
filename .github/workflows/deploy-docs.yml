@@ -31,6 +31,10 @@ jobs:
           cache: npm
           cache-dependency-path: docs-site/package-lock.json
 
+      - name: Audit docs dependencies
+        run: npm run audit:dependencies
+        working-directory: docs-site
+
       - name: Install dependencies
         run: npm ci
         working-directory: docs-site

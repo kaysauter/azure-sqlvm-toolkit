@@ -3,6 +3,27 @@ title: Troubleshooting
 description: Common current-script issues.
 ---
 
+## Capture A Structured Error Log
+
+Add `-ErrorLogPath` to the failing plan, WhatIf, or deployment command:
+
+```powershell
+New-AzureSqlVmToolkitDeployment `
+  -ConfigFile .\config.local.yaml `
+  -WhatIf `
+  -ErrorLogPath .\test-results\errors\deployment.jsonl
+```
+
+The file is created only for a terminating failure. Inspect its run ID, phase, resource context, and Azure correlation ID:
+
+```powershell
+Get-Content .\test-results\errors\deployment.jsonl |
+  ForEach-Object { $_ | ConvertFrom-Json } |
+  Select-Object timestampUtc, runId, mode, phase, azureCorrelationId
+```
+
+Known secret formats are redacted, but exception text can come from external providers. Review the file before sharing it and keep it out of source control. If logging itself fails, the warning describes the logging problem while the original deployment error remains the terminating error.
+
 ## Missing `powershell-yaml`
 
 Install it:
