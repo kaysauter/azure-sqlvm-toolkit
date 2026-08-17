@@ -239,6 +239,27 @@ $encryptedPrivateKey
         { Resolve-ToolkitErrorLogPath -Path $TestDrive } | Should -Throw -ExpectedMessage "*points to a directory*"
     }
 
+    It "uses one chmod executable when the command resolves to multiple paths" -Skip:$IsWindows {
+        $chmodCommand = Get-Command -Name "chmod" -CommandType Application | Select-Object -First 1
+        Mock -CommandName Get-Command -ModuleName AzureSqlVmToolkit.Common -ParameterFilter {
+            $Name -eq "chmod" -and $CommandType -eq [System.Management.Automation.CommandTypes]::Application
+        } -MockWith {
+            @($chmodCommand, $chmodCommand)
+        }
+        $path = Join-Path $TestDrive "multiple-chmod-paths.jsonl"
+        $errorRecord = try {
+            throw "Multiple chmod paths test failed."
+        }
+        catch {
+            $_
+        }
+
+        Write-ToolkitErrorLog -ErrorRecord $errorRecord -Path $path -RunId "multiple-chmod" -Mode "Plan" | Out-Null
+
+        Test-Path -LiteralPath $path | Should -BeTrue
+        Should -Invoke -CommandName Get-Command -ModuleName AzureSqlVmToolkit.Common -Exactly 1
+    }
+
     It "preserves backslashes in Unix error log paths" -Skip:$IsWindows {
         $directory = [System.IO.Path]::Combine($TestDrive, 'backslash\component')
         [System.IO.Directory]::CreateDirectory($directory) | Out-Null

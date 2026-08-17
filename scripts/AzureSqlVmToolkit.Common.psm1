@@ -749,12 +749,13 @@ function Set-ToolkitErrorLogFilePermission {
         return
     }
 
-    $chmod = Get-Command -Name "chmod" -CommandType Application -ErrorAction SilentlyContinue
-    if (-not $chmod) {
+    $chmodPath = Get-Command -Name "chmod" -CommandType Application -ErrorAction SilentlyContinue |
+        Select-Object -First 1 -ExpandProperty Path
+    if ([string]::IsNullOrWhiteSpace($chmodPath)) {
         throw "Unable to restrict error log permissions because chmod is unavailable."
     }
 
-    & $chmod.Source "600" $Path
+    & $chmodPath "600" $Path
     if ($LASTEXITCODE -ne 0) {
         throw "Unable to restrict error log permissions for '$Path'."
     }
